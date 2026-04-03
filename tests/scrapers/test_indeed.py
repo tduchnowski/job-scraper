@@ -7,6 +7,7 @@ def scraper():
     # session is not used in parsing, so can be None
     return IndeedScraper(session=None)
 
+
 def test_parse_job_list_basic(scraper):
     html = """
     <html>
@@ -27,6 +28,7 @@ def test_parse_job_list_basic(scraper):
     assert job.company == "Acme Corp"
     assert "jk=abc123" in job.url
 
+
 def test_title_nested_in_span(scraper):
     html = """
     <div class="job_seen_beacon">
@@ -41,6 +43,7 @@ def test_title_nested_in_span(scraper):
     jobs = scraper._parse_job_list(html)
     assert len(jobs) == 1
     assert jobs[0].title == "Python Developer"
+
 
 def test_title_with_noise(scraper):
     html = """
@@ -58,6 +61,7 @@ def test_title_with_noise(scraper):
     assert len(jobs) == 1
     assert "Python Developer" in jobs[0].title
 
+
 def test_parse_skips_missing_title(scraper):
     html = """
     <div class="job_seen_beacon">
@@ -67,6 +71,7 @@ def test_parse_skips_missing_title(scraper):
     """
     jobs = scraper._parse_job_list(html)
     assert jobs == []
+
 
 def test_parse_skips_missing_jk(scraper):
     html = """
@@ -78,6 +83,7 @@ def test_parse_skips_missing_jk(scraper):
     """
     jobs = scraper._parse_job_list(html)
     assert jobs == []
+
 
 def test_parse_multiple_jobs(scraper):
     html = """
@@ -96,6 +102,7 @@ def test_parse_multiple_jobs(scraper):
     assert len(jobs) == 2
     assert {job.id for job in jobs} == {"1", "2"}
 
+
 def test_jk_extraction(scraper):
     html = """
     <div class="job_seen_beacon">
@@ -106,6 +113,7 @@ def test_jk_extraction(scraper):
     """
     jobs = scraper._parse_job_list(html)
     assert jobs[0].id == "xyz789"
+
 
 def test_duplicate_jobs(scraper):
     html = """

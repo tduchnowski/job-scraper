@@ -10,6 +10,7 @@ class JobStatus(str, Enum):
     DONE = "DONE"
     FAILED = "FAILED"
 
+
 class Job(BaseModel):
     id: str = Field(..., description="Indeed job key (jk)")
     url: str
