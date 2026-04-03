@@ -7,7 +7,6 @@ def scraper():
     # session is not used in parsing, so can be None
     return IndeedScraper(session=None)
 
-
 def test_parse_job_list_basic(scraper):
     html = """
     <html>
@@ -20,11 +19,8 @@ def test_parse_job_list_basic(scraper):
         </body>
     </html>
     """
-
     jobs = scraper._parse_job_list(html)
-
     assert len(jobs) == 1
-
     job = jobs[0]
     assert job.id == "abc123"
     assert job.title == "Python Developer"
@@ -58,7 +54,6 @@ def test_title_with_noise(scraper):
         <span data-testid="company-name">Acme</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
     assert len(jobs) == 1
     assert "Python Developer" in jobs[0].title
@@ -70,7 +65,6 @@ def test_parse_skips_missing_title(scraper):
         <span data-testid="company-name">Acme Corp</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
     assert jobs == []
 
@@ -82,7 +76,6 @@ def test_parse_skips_missing_jk(scraper):
         <span data-testid="company-name">Acme</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
     assert jobs == []
 
@@ -99,9 +92,7 @@ def test_parse_multiple_jobs(scraper):
         <span data-testid="company-name">Acme Corp</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
-
     assert len(jobs) == 2
     assert {job.id for job in jobs} == {"1", "2"}
 
@@ -113,24 +104,23 @@ def test_jk_extraction(scraper):
         <span data-testid="company-name">A</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
-
     assert jobs[0].id == "xyz789"
 
 def test_duplicate_jobs(scraper):
     html = """
     <div class="job_seen_beacon">
-        <a data-jk="same"><h2 class="jobTitle">Dev</h2></a>
+        <a data-jk="same" href="/rc/clk?jk=same"><h2 class="jobTitle">Dev</h2></a>
         <span data-testid="company-name">A</span>
     </div>
     <div class="job_seen_beacon">
-        <a data-jk="same"><h2 class="jobTitle">Dev</h2></a>
+        <a data-jk="same" href="/rc/clk?jk=same"><h2 class="jobTitle">Dev</h2></a>
+        <span data-testid="company-name">A</span>
+    </div>
+    <div class="job_seen_beacon">
+        <a data-jk="diff" href="/rc/clk?jk=diff"><h2 class="jobTitle">Dev</h2></a>
         <span data-testid="company-name">A</span>
     </div>
     """
-
     jobs = scraper._parse_job_list(html)
-
-    # your current behavior (no dedup)
-    assert len(jobs) == 1
+    assert len(jobs) == 2

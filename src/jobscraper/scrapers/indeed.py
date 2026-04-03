@@ -38,6 +38,7 @@ class IndeedScraper:
         soup = BeautifulSoup(html, "lxml")
         jobs = soup.find_all("div", {"class": "job_seen_beacon"})
         result: list[Job] = []
+        job_ids = set()
 
         for job in jobs:
             title = job.find("h2", {"class": "jobTitle"})
@@ -53,8 +54,13 @@ class IndeedScraper:
                 continue
             jk = link.get('data-jk')
             if not jk:
-                logger.warning(f"Couldn't extract job id")
+                logger.warning("Couldn't extract job id")
                 continue
+            if jk in job_ids:
+                logger.warning(f"job id {jk} already seen, skipping")
+                continue
+
+            job_ids.add(jk)
             job_url = f"{self._jobview_url}?jk={jk}"
 
             result.append(
