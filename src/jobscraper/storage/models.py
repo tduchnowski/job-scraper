@@ -1,9 +1,10 @@
-from sqlalchemy import String, Integer, DateTime, Text, JSON
+from sqlalchemy import String, Integer, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Optional, List
 
 from jobscraper.storage.base import Base
+
 
 class JobORM(Base):
     __tablename__ = "jobs"
