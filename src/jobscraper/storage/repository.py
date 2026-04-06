@@ -8,7 +8,6 @@ from jobscraper.storage.mappers import to_orm
 
 
 class JobRepository:
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
