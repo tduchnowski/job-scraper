@@ -28,10 +28,10 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev,test
 
-      - name: Run formatter (black)
-        run: poetry run black --check .
+      - name: Run formatter
+        run: poetry run ruff format --check .
 
-      - name: Run linter (ruff)
+      - name: Run linter
         run: poetry run ruff check .
 
       - name: Run tests
