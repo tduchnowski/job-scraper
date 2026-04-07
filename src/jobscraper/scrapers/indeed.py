@@ -1,3 +1,4 @@
+from typing import Dict
 from bs4 import BeautifulSoup
 import aiohttp
 from loguru import logger
@@ -5,6 +6,14 @@ from jobscraper.models.job import Job
 
 
 class IndeedScraper:
+    _HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.google.com/",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    }
+
     def __init__(self, session: aiohttp.ClientSession | None):
         self._base_url = "https://pl.indeed.com/jobs"
         self._jobview_url = "https://pl.indeed.com/viewjob"
@@ -15,25 +24,18 @@ class IndeedScraper:
         resp = await self._fetch_job_list(query, location)
         return self._parse_job_list(resp)
 
-    async def _fetch_job_list(self, query: str, location: str) -> str:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://www.google.com/",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        }
-        params = {
-            "q": query,
-            "l": location,
-            "radius": 25,
-            "sort": "date",
-        }
+    async def _fetch_job_list(self, query: str, location: str, radius=25) -> str:
         if self._session is None:
             logger.warning("Session is None, so can't fetch job postings")
             return ""
+        params = {
+            "q": query,
+            "l": location,
+            "radius": radius,
+            "sort": "date",
+        }
         async with self._session.get(
-            self._base_url, params=params, headers=headers
+            self._base_url, params=params, headers=self._HEADERS
         ) as response:
             return await response.text()
 
@@ -66,9 +68,26 @@ class IndeedScraper:
             job_ids.add(jk)
             job_url = f"{self._jobview_url}?jk={jk}"
 
-            result.append(Job(id=str(jk), title=title, company=company, url=job_url))
+            result.append(
+                Job(
+                    id=str(jk),
+                    title=title,
+                    company=company,
+                    url=job_url,
+                )
+            )
         logger.info(f"Scraped {len(result)} jobs")
         return result
 
-    def scrape_job_details(self, job_id: str):
-        pass
+    async def scrape_job_details(self, job_url: str) -> Dict[str, str]:
+        if self._session is None:
+            logger.warning("Session is None, so can't fetch job details")
+            return {}
+        async with self._session.get(job_url, headers=self._HEADERS) as response:
+            return self._parse_job_details(await response.text())
+
+    def _parse_job_details(self, html: str) -> Dict[str, str]:
+        return {"description": "test description", "location": "Warszawa"}
+
+    def _parse_description(self, html) -> str:
+        return ""
