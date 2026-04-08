@@ -1,6 +1,14 @@
-from sqlalchemy import String, Text, JSON, Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
+from sqlalchemy import (
+    String,
+    Text,
+    Boolean,
+    JSON,
+    ForeignKey,
+    UniqueConstraint,
+    Enum as SAEnum,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from jobscraper.models.job import JobCategory
@@ -28,6 +36,54 @@ class JobORM(Base):
 
     status: Mapped[str] = mapped_column(String, default="NEW")
 
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.fromtimestamp(0, tz=timezone.utc)
+    )
     scraped_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)  # Telegram user_id
+    chat_id: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_interaction: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    subscriptions: Mapped[list["UserSubscription"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_notified_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.fromtimestamp(0, tz=timezone.utc)
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="subscriptions")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "category", "location", name="unique_user_subscription"
+        ),
+    )
