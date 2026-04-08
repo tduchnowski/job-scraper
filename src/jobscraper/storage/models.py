@@ -45,7 +45,7 @@ class JobORM(Base):
     scraped_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
 
-class User(Base):
+class UserORM(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)  # Telegram user_id
@@ -59,12 +59,12 @@ class User(Base):
     )
 
     # Relationships
-    subscriptions: Mapped[list["UserSubscription"]] = relationship(
+    subscriptions: Mapped[list["UserSubscriptionORM"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
 
-class UserSubscription(Base):
+class UserSubscriptionORM(Base):
     __tablename__ = "user_subscriptions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -80,7 +80,7 @@ class UserSubscription(Base):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship(back_populates="subscriptions")
+    user: Mapped["UserORM"] = relationship(back_populates="subscriptions")
 
     __table_args__ = (
         UniqueConstraint(

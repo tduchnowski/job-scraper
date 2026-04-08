@@ -4,7 +4,7 @@ from typing import Optional
 
 from jobscraper.models.job import Job
 from jobscraper.storage.models import JobORM
-from jobscraper.storage.mappers import to_orm
+from jobscraper.storage.mappers import job_to_orm
 
 
 class JobRepository:
@@ -17,7 +17,7 @@ class JobRepository:
             for k, v in job.model_dump().items():
                 setattr(existing, k, v)
         else:
-            self.session.add(to_orm(job))
+            self.session.add(job_to_orm(job))
         await self.session.commit()
 
     async def get(self, job_id: str) -> Optional[JobORM]:
