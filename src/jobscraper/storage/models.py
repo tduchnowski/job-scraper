@@ -25,7 +25,7 @@ class JobORM(Base):
     category: Mapped[Optional[JobCategory]] = mapped_column(
         SAEnum(JobCategory), nullable=True
     )
-    location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    location: Mapped[str] = mapped_column(String, nullable=True)
 
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     salary: Mapped[Optional[str]] = mapped_column(String, nullable=True)

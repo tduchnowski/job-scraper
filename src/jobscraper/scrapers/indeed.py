@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import aiohttp
 from loguru import logger
-from jobscraper.models.job import Job
+from jobscraper.models.job import Job, JobCategory
 
 
 class IndeedScraper:
@@ -73,6 +73,8 @@ class IndeedScraper:
                     title=title,
                     company=company,
                     url=job_url,
+                    category=JobCategory.PYTHON,
+                    location="Poland",
                 )
             )
         logger.info(f"Scraped {len(result)} jobs")
