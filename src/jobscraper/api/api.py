@@ -1,4 +1,3 @@
-import asyncio
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from aiogram import Dispatcher, types
@@ -61,22 +60,8 @@ async def start_cmd(message: types.Message):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start bot polling in background
-    logger.info("start bot polling")
-    polling_task = asyncio.create_task(dp.start_polling(bot))
+    setup_logger()
     yield
-    # Cleanup on shutdown
-    polling_task.cancel()
-    try:
-        await asyncio.wait_for(polling_task, timeout=10.0)
-        logger.info("Bot polling stopped")
-    except asyncio.TimeoutError:
-        logger.warning("Bot polling timeout, forcing stop")
-    except asyncio.CancelledError:
-        logger.info("Bot polling cancelled")
-
-    await bot.session.close()
-    logger.info("Bot session closed")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -87,6 +72,7 @@ async def webhook(request: Request):
     """
     Telegram bot updates
     """
+    print("Received update")
     return {"ok": True}
 
 
@@ -130,7 +116,7 @@ async def scrape_jobs():
                 for user in users_to_notify.scalars():
                     notification = NotificationORM(user_id=user.id, job_id=job.id)
                     session.add(notification)
-
+                await session.commit()
                 job.status = JobStatus.PROCESSED
             await session.commit()
 
