@@ -1,9 +1,10 @@
 import aiohttp
 from fastapi import FastAPI, Request
-from sqlalchemy import select
+from sqlalchemy import and_, select
+from sqlalchemy.orm.strategy_options import selectinload
 
 from jobscraper.scrapers.indeed import IndeedScraper
-from jobscraper.storage.models import UserSubscriptionORM
+from jobscraper.storage.models import JobORM, UserSubscriptionORM
 from jobscraper.storage.repository import JobRepository
 from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
@@ -54,9 +55,22 @@ async def dispatch_jobs():
     """
     Triggers sending new jobs to users
     """
+    logger.info("Starting scheduled dispatcher")
     async with SessionLocal() as session:
-        subs_query = select(UserSubscriptionORM)
+        subs_query = select(UserSubscriptionORM).options(
+            selectinload(UserSubscriptionORM.user)
+        )
         subs = await session.execute(subs_query)
         for sub in subs.scalars():
-            print(sub.id, sub.user.username)
+            stmt = select(JobORM).where(
+                and_(
+                    JobORM.status == "NEW",
+                    JobORM.location == sub.location,
+                    JobORM.category == sub.category,
+                    JobORM.created_at > sub.last_notified_at,
+                )
+            )
+            matching_jobs = (await session.execute(stmt)).scalars().all()
+            logger.info(f"Found {len(matching_jobs)} for user: {sub.user.username}")
+            # for a matching job send the notification
     return {"ok": True}
