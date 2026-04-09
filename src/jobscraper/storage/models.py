@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    Index,
     String,
     Text,
     Boolean,
@@ -86,4 +87,54 @@ class UserSubscriptionORM(Base):
         UniqueConstraint(
             "user_id", "category", "location", name="unique_user_subscription"
         ),
+    )
+
+
+class NotificationORM(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # --- delivery state ---
+    status: Mapped[str] = mapped_column(
+        default="pending",  # pending | processing | sent | failed
+        nullable=False,
+    )
+
+    attempts: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+
+    # --- retry control ---
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+
+    # --- timestamps ---
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # --- constraints ---
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_notification"),
+        Index("idx_notifications_status_next_attempt", "status", "next_attempt_at"),
+        Index("idx_notifications_user_id", "user_id"),
     )
