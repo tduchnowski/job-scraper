@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from aiogram import Dispatcher, types
 from aiogram.filters import Command
@@ -6,11 +7,16 @@ import aiohttp
 from fastapi import FastAPI, Request
 from sqlalchemy import and_, select
 from sqlalchemy.orm.strategy_options import selectinload
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from jobscraper.api.bot import create_bot
+from jobscraper.models.job import JobStatus
 from jobscraper.scrapers.indeed import IndeedScraper
-from jobscraper.storage.models import JobORM, UserORM, UserSubscriptionORM
+from jobscraper.storage.models import (
+    NotificationORM,
+    UserORM,
+    UserSubscriptionORM,
+)
 from jobscraper.storage.repository import JobRepository
 from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
@@ -92,14 +98,41 @@ async def scrape_jobs():
     """
     logger.info("Starting scheduled job scraping")
     try:
+        # scrape job boards
         async with aiohttp.ClientSession() as session:
             indeed = IndeedScraper(session)
-            jobs = await indeed.scrape_job_list("python developer", "Polska")
+            jobs = await indeed.scrape_job_list("python developer", "Poland")
 
         async with SessionLocal() as session:
+            # save new jobs
             repo = JobRepository(session)
             for job in jobs:
                 await repo.upsert(job)
+
+            # create notifications for subscriptions
+            new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
+            for job in new_jobs:
+                query = (
+                    select(UserORM)
+                    .join(
+                        UserSubscriptionORM, UserSubscriptionORM.user_id == UserORM.id
+                    )
+                    .where(
+                        and_(
+                            UserSubscriptionORM.is_active,
+                            UserSubscriptionORM.category == job.category,
+                            UserSubscriptionORM.location == job.location,
+                            UserSubscriptionORM.last_notified_at < job.created_at,
+                        )
+                    )
+                )
+                users_to_notify = await session.execute(query)
+                for user in users_to_notify.scalars():
+                    notification = NotificationORM(user_id=user.id, job_id=job.id)
+                    session.add(notification)
+
+                job.status = JobStatus.PROCESSED
+            await session.commit()
 
         return {
             "ok": True,
@@ -117,46 +150,110 @@ async def dispatch_jobs():
     """
     Triggers sending new jobs to users
     """
-    logger.info("Starting scheduled dispatcher")
     async with SessionLocal() as session:
-        subs_query = select(UserSubscriptionORM).options(
-            selectinload(UserSubscriptionORM.user)
-        )
-        subs = await session.execute(subs_query)
-        for sub in subs.scalars():
-            stmt = select(JobORM).where(
+        # Get pending notifications (oldest first)
+        stmt = (
+            select(NotificationORM)
+            .where(
                 and_(
-                    JobORM.status == "NEW",
-                    JobORM.location == sub.location,
-                    JobORM.category == sub.category,
-                    JobORM.created_at > sub.last_notified_at,
+                    NotificationORM.status == "pending",
+                    NotificationORM.next_attempt_at <= datetime.now(timezone.utc),
                 )
             )
-            matching_jobs = (await session.execute(stmt)).scalars().all()
-            logger.info(f"User: {sub.user.username}")
-            logger.info(f"Found {len(matching_jobs)} for user: {sub.user.username}")
-            for job in matching_jobs:
-                message = (
-                    f"🎉 New {job.category} job in {job.location}!\n\n"
-                    f"📌 *{job.title}*\n"
-                    f"🏢 {job.company}\n"
-                    f"💰 {job.salary or 'Not specified'}\n"
-                    f"🔗 [Apply here]({job.url})\n\n"
-                )
+            .order_by(
+                NotificationORM.created_at.asc()  # Oldest first
+            )
+            .limit(100)
+            .options(
+                selectinload(NotificationORM.user), selectinload(NotificationORM.job)
+            )
+        )
+
+        result = await session.execute(stmt)
+        notifications = result.scalars().all()
+
+        if not notifications:
+            logger.debug("No pending notifications")
+            return {"ok": True, "notifications_sent": 0}
+
+        # Group by user
+        user_notifications = defaultdict(list)
+        for notification in notifications:
+            user_notifications[notification.user_id].append(notification)
+
+        sent_count = 0
+        failed_count = 0
+
+        # Process each user
+        for user_id, user_nots in user_notifications.items():
+            user = user_nots[0].user  # Get user from first notification
+
+            # Group jobs in batches of 5
+            job_batches = [user_nots[i : i + 5] for i in range(0, len(user_nots), 5)]
+
+            for batch in job_batches:
                 try:
-                    await bot.send_message(
-                        chat_id=sub.user.chat_id,
-                        text=message,
-                        parse_mode="Markdown",
-                        disable_web_page_preview=False,
+                    # Build message with multiple jobs
+                    jobs_text = "\n\n---\n\n".join(
+                        [
+                            f"📌 *{n.job.title}*\n"
+                            f"🏢 {n.job.company}\n"
+                            f"💰 {n.job.salary or 'Not specified'}\n"
+                            f"📍 {n.job.location}\n"
+                            f"🔗 [View]({n.job.url})"
+                            for n in batch
+                        ]
                     )
 
-                    # Update last_notified_at
-                    sub.last_notified_at = datetime.now(timezone.utc)
-                    await session.commit()
+                    message = (
+                        f"🎉 *New job alert!*\n\n"
+                        f"{jobs_text}\n\n"
+                        f"Use /subscribe to manage preferences"
+                    )
 
-                    logger.info(f"Sent job {job.id} to user {sub.user.id}")
+                    # Send to Telegram
+                    await bot.send_message(
+                        chat_id=user.chat_id,
+                        text=message,
+                        parse_mode="Markdown",
+                        disable_web_page_preview=True,
+                    )
+
+                    # Mark as sent
+                    for notification in batch:
+                        notification.status = "sent"
+                        notification.last_attempt_at = datetime.now(timezone.utc)
+
+                    sent_count += len(batch)
+                    logger.info(f"Sent {len(batch)} jobs to user {user_id}")
 
                 except Exception as e:
-                    logger.error(f"Failed to send to {sub.user.id}: {e}")
-    return {"ok": True}
+                    logger.error(f"Failed to send to user {user_id}: {e}")
+
+                    # Mark as failed with retry logic
+                    for notification in batch:
+                        notification.attempts += 1
+                        notification.last_attempt_at = datetime.now(timezone.utc)
+
+                        if notification.attempts >= 3:
+                            notification.status = "failed"
+                            logger.warning(
+                                f"Notification {notification.id} failed after 3 attempts"
+                            )
+                        else:
+                            # Retry in exponential backoff: 5min, 30min, 2h
+                            delay = 60 * (2**notification.attempts)  # 2, 4, 8 minutes
+                            notification.next_attempt_at = datetime.now(
+                                timezone.utc
+                            ) + timedelta(seconds=delay)
+
+                    failed_count += len(batch)
+
+        await session.commit()
+
+        logger.info(f"Dispatch completed: {sent_count} sent, {failed_count} failed")
+        return {
+            "ok": True,
+            "notifications_sent": sent_count,
+            "notifications_failed": failed_count,
+        }

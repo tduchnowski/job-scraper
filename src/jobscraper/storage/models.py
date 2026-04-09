@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from jobscraper.models.job import JobCategory
+from jobscraper.models.job import JobCategory, JobStatus
 from jobscraper.storage.base import Base
 
 
@@ -35,7 +35,7 @@ class JobORM(Base):
     seniority: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    status: Mapped[str] = mapped_column(String, default="NEW")
+    status: Mapped[JobStatus] = mapped_column(SAEnum(JobStatus), default=JobStatus.NEW)
 
     created_at: Mapped[datetime] = mapped_column(
         nullable=False, default=lambda: datetime.now(timezone.utc)
@@ -71,7 +71,7 @@ class UserSubscriptionORM(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    category: Mapped[JobCategory] = mapped_column(SAEnum(JobCategory), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_notified_at: Mapped[datetime] = mapped_column(
         nullable=False, default=lambda: datetime.fromtimestamp(0, tz=timezone.utc)
@@ -131,6 +131,9 @@ class NotificationORM(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    user: Mapped["UserORM"] = relationship(foreign_keys=[user_id])
+    job: Mapped["JobORM"] = relationship(foreign_keys=[job_id])
 
     # --- constraints ---
     __table_args__ = (

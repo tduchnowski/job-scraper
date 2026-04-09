@@ -6,7 +6,7 @@ from datetime import datetime
 
 class JobStatus(str, Enum):
     NEW = "NEW"
-    DELIVERED = "DELIVERED"
+    PROCESSED = "PROCESSED"
 
 
 class JobCategory(str, Enum):
