@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from aiogram import Dispatcher, types
 from aiogram.filters import Command
 import aiohttp
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from sqlalchemy import and_, select
 from sqlalchemy.orm.strategy_options import selectinload
 from datetime import datetime, timedelta, timezone
@@ -69,11 +69,19 @@ app = FastAPI(lifespan=lifespan)
 
 @app.post("/webhook")
 async def webhook(request: Request):
-    """
-    Telegram bot updates
-    """
-    print("Received update")
-    return {"ok": True}
+    """Handle Telegram webhook updates."""
+    try:
+        # Parse update
+        update_data = await request.json()
+        update = types.Update(**update_data)
+
+        # Feed to dispatcher
+        await dp.feed_update(bot, update)
+
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+    finally:
+        return Response(status_code=200)  # Always return 200 to Telegram
 
 
 @app.post("/scrape")
