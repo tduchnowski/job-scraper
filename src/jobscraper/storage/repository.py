@@ -33,6 +33,16 @@ class JobRepository:
         await self.session.commit()
         return orm_obj, result
 
+    async def upsert_batch(self, jobs: list[Job]) -> int:
+        """
+        Upsert batch of jobs and return if the operation was successful
+        """
+        jobs_orm = [job_to_orm(job) for job in jobs]
+        for job_orm in jobs_orm:
+            await self.session.merge(job_orm)
+        await self.session.commit()
+        return len(jobs_orm)
+
     async def get(self, job_id: str) -> Optional[JobORM]:
         return await self.session.get(JobORM, job_id)
 

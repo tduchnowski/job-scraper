@@ -64,8 +64,7 @@ async def scrape_jobs():
         async with SessionLocal() as session:
             # save new jobs
             repo = JobRepository(session)
-            for job in jobs:
-                await repo.upsert(job)
+            await repo.upsert_batch(jobs)
 
             # create notifications for subscriptions
             new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
