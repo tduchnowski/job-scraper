@@ -1,14 +1,13 @@
+from fastapi import FastAPI, Request, Response
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from aiogram import Dispatcher, types
-from aiogram.filters import Command
+from aiogram import types
 import aiohttp
-from fastapi import FastAPI, Request, Response
 from sqlalchemy import and_, select
 from sqlalchemy.orm.strategy_options import selectinload
 from datetime import datetime, timedelta, timezone
 
-from jobscraper.api.bot import create_bot
+from jobscraper.bot import init_bot_and_dispatcher
 from jobscraper.models.job import JobStatus
 from jobscraper.scrapers.indeed import IndeedScraper
 from jobscraper.storage.models import (
@@ -21,153 +20,11 @@ from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
 
-setup_logger()
-bot = create_bot()
-dp = Dispatcher()
-
-
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    # Save user to database
-    async with SessionLocal() as session:
-        # Check if user exists
-        if not message.from_user:
-            return
-        user = await session.get(UserORM, message.from_user.id)
-
-        if not user:
-            # Create new user
-            user = UserORM(
-                id=message.from_user.id,
-                chat_id=message.chat.id,
-                username=message.from_user.username,
-                created_at=datetime.now(timezone.utc),
-                last_interaction=datetime.now(timezone.utc),
-            )
-            session.add(user)
-            await session.commit()
-            logger.info(f"New user saved: {user.id} ({user.username})")
-        else:
-            # Update last interaction
-            user.last_interaction = datetime.now(timezone.utc)
-            await session.commit()
-            logger.debug(f"User updated: {user.id}")
-
-    await message.answer(
-        "Hi! Welcome to Job Notifier Bot. Use /subscribe to get job notifications."
-    )
-
-
-VALID_CATEGORIES = {"PYTHON", "DATA_SCIENCE", "AI"}
-VALID_LOCATIONS = {"POLAND", "US", "GERMANY", "ARGENTINA", "REMOTE"}
-
-
-@dp.message(Command("subscribe"))
-async def subscribe_cmd(message: types.Message):
-    """Handle /subscribe category location command."""
-    if not message.text:
-        return
-
-    # Parse arguments
-    args = message.text.split()
-    if len(args) != 3:
-        await message.answer(
-            "Usage: /subscribe <category> <location>\n\n"
-            f"Valid categories: {', '.join(VALID_CATEGORIES)}\n"
-            "Location examples: Poland, Germany, Remote, UK\n\n"
-            "Example: `/subscribe PYTHON Poland`",
-        )
-        return
-
-    _, category, location = args
-    category = category.upper()
-    location = location.upper()
-
-    # Validate category
-    if category not in VALID_CATEGORIES:
-        await message.answer(
-            f"❌ Invalid category: `{category}`\n\n"
-            "✅ Valid categories:\n"
-            f"{'\n'.join(VALID_CATEGORIES)}"
-        )
-        return
-
-    # Validate location (basic - not empty)
-    if location not in VALID_LOCATIONS:
-        await message.answer(
-            "❌ Please provide a valid country as a location.\n\n"
-            "Examples: `Poland`, `Germany`, `Remote`, `UK`",
-        )
-        return
-
-    # Save subscription
-    async with SessionLocal() as session:
-        # Check if user exists, create if not
-        if not message.from_user:
-            return
-        user = await session.get(UserORM, message.from_user.id)
-        if not user:
-            user = UserORM(
-                id=message.from_user.id,
-                chat_id=message.chat.id,
-                username=message.from_user.username,
-                created_at=datetime.now(timezone.utc),
-                last_interaction=datetime.now(timezone.utc),
-            )
-            session.add(user)
-            await session.commit()
-
-        # Check if subscription already exists
-        existing = await session.execute(
-            select(UserSubscriptionORM).where(
-                and_(
-                    UserSubscriptionORM.user_id == message.from_user.id,
-                    UserSubscriptionORM.category == category,
-                    UserSubscriptionORM.location == location,
-                )
-            )
-        )
-        if existing.scalar_one_or_none():
-            await message.answer(
-                f"ℹ️ You're already subscribed to `{category}` jobs in `{location}`.\n\n"
-                f"Use `/unsubscribe {category} {location}` to remove.",
-                parse_mode="Markdown",
-            )
-            return
-
-        # Create new subscription
-        try:
-            subscription = UserSubscriptionORM(
-                user_id=message.from_user.id,
-                category=category,
-                location=location,
-                is_active=True,
-                created_at=datetime.now(timezone.utc),
-                last_notified_at=datetime.fromtimestamp(0, tz=timezone.utc),
-            )
-            session.add(subscription)
-            await session.commit()
-
-            await message.answer(
-                f"✅ Subscribed to `{category}` jobs in `{location}`!\n\n"
-                f"You'll receive notifications for new matching jobs.\n"
-                f"Use `/unsubscribe {category} {location}` to stop.",
-            )
-            logger.info(
-                f"User {message.from_user.id} subscribed to {category}/{location}"
-            )
-
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Failed to create subscription: {e}")
-            await message.answer(
-                "❌ Failed to create subscription. Please try again later.",
-            )
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logger()
+    app.state.bot, app.state.dp = init_bot_and_dispatcher()
     yield
 
 
@@ -183,7 +40,7 @@ async def webhook(request: Request):
         update = types.Update(**update_data)
 
         # Feed to dispatcher
-        await dp.feed_update(bot, update)
+        await app.state.dp.feed_update(app.state.bot, update)
 
     except Exception as e:
         logger.error(f"Webhook error: {e}")
@@ -313,7 +170,7 @@ async def dispatch_jobs():
                     )
 
                     # Send to Telegram
-                    await bot.send_message(
+                    await app.state.bot.send_message(
                         chat_id=user.chat_id,
                         text=message,
                         parse_mode="Markdown",
