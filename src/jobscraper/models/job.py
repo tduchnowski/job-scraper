@@ -13,6 +13,7 @@ class JobCategory(str, Enum):
     PYTHON = "PYTHON"
     AI = "AI"
     DATA_SCIENCE = "DATA SCIENCE"
+    DEVOPS = "DEVOPS"
 
 
 class Job(BaseModel):
