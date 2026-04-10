@@ -8,12 +8,10 @@ from sqlalchemy.orm.strategy_options import selectinload
 from datetime import datetime, timedelta, timezone
 
 from jobscraper.bot import init_bot_and_dispatcher
-from jobscraper.models.job import JobStatus
 from jobscraper.scrapers.indeed import IndeedScraper
+from jobscraper.services.notification_service import NotificationService
 from jobscraper.storage.models import (
     NotificationORM,
-    UserORM,
-    UserSubscriptionORM,
 )
 from jobscraper.storage.repository import JobRepository
 from jobscraper.storage.session import SessionLocal
@@ -51,7 +49,7 @@ async def webhook(request: Request):
 @app.post("/scrape")
 async def scrape_jobs():
     """
-    Triggers scraping of job boards and updating DB with new jobs
+    Triggers scraping of job boards and updating DB with new jobs and notifications
     This endpoint is intended for scheduler use only. Not publicly available.
     """
     logger.info("Starting scheduled job scraping")
@@ -67,29 +65,9 @@ async def scrape_jobs():
             await repo.upsert_batch(jobs)
 
             # create notifications for subscriptions
+            notification_service = NotificationService(session)
             new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
-            for job in new_jobs:
-                query = (
-                    select(UserORM)
-                    .join(
-                        UserSubscriptionORM, UserSubscriptionORM.user_id == UserORM.id
-                    )
-                    .where(
-                        and_(
-                            UserSubscriptionORM.is_active,
-                            UserSubscriptionORM.category == job.category,
-                            UserSubscriptionORM.location == job.location,
-                            UserSubscriptionORM.last_notified_at < job.created_at,
-                        )
-                    )
-                )
-                users_to_notify = await session.execute(query)
-                for user in users_to_notify.scalars():
-                    notification = NotificationORM(user_id=user.id, job_id=job.id)
-                    session.add(notification)
-                await session.commit()
-                job.status = JobStatus.PROCESSED
-            await session.commit()
+            await notification_service.create_for_new_jobs(new_jobs)
 
         return {
             "ok": True,
