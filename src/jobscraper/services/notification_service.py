@@ -30,6 +30,7 @@ class NotificationService:
             )
         )
         user_ids = (await self.session.execute(query)).scalars().all()
+        print(user_ids)
         if not user_ids:
             return 0
 

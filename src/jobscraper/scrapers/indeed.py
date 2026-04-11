@@ -24,7 +24,18 @@ class IndeedScraper:
     async def scrape_job_list(self, query: str) -> list[Job]:
         logger.info(f"Scraping Indeed, query={query}, location={self.location}")
         resp = await self._fetch_job_list(query)
-        return self._parse_job_list(resp)
+        if "captcha" in resp.lower():
+            print("CAPTCHA detected")
+
+        if "unusual traffic" in resp.lower():
+            print("Blocked by anti-bot")
+
+        if "jobsearch-SerpJobCard" not in resp:
+            print("Expected job cards missing")
+        jobs = self._parse_job_list(resp)
+        if not jobs:
+            logger.warning("Couldn't find any jobs on served html")
+        return jobs
 
     async def _fetch_job_list(self, query: str, radius=25) -> str:
         if self._session is None:
@@ -39,6 +50,15 @@ class IndeedScraper:
         async with self._session.get(
             self._base_url, params=params, headers=self._HEADERS
         ) as response:
+            print(
+                {
+                    "status": response.status,
+                    "url": str(response.url),
+                    "final_url": str(response.real_url),
+                    "length": len(await response.text()),
+                    "headers": dict(response.headers),
+                }
+            )
             return await response.text()
 
     def _parse_job_list(self, html: str) -> list[Job]:

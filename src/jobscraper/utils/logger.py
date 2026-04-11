@@ -5,7 +5,7 @@ import os
 
 def setup_logger():
     logger.remove()
-    env = os.getenv("ENV", "dev")
+    env = os.getenv("ENVIRONMENT", "dev")
     is_prod = env == "prod"
     logger.add(
         sys.stdout,

@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, Request, Response
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -5,6 +6,7 @@ from aiogram import types
 import aiohttp
 
 from jobscraper.bot import init_bot_and_dispatcher
+from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
 from jobscraper.services.notification_processor import process_notification_batch
 from jobscraper.services.notification_service import NotificationService
 from jobscraper.services.scraping_orchestrator import scrape_all
@@ -49,7 +51,10 @@ async def scrape_jobs():
     """
     logger.info("Starting scheduled job scraping")
     try:
-        jobs = await scrape_all()
+        start_t = time.perf_counter()
+        jobs = await scrape_all(LOCATIONS, SEARCH_QUERIES)
+        elapsed = time.perf_counter() - start_t
+        logger.info(f"Scraping done in {elapsed:.2f}")
 
         async with SessionLocal() as session:
             # save new jobs

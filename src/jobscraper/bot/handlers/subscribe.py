@@ -3,11 +3,9 @@ from aiogram.types import Message
 from loguru import logger
 from sqlalchemy import and_, select
 
+from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
 from jobscraper.storage.models import UserORM, UserSubscriptionORM
 from jobscraper.storage.session import SessionLocal
-
-VALID_CATEGORIES = {"PYTHON", "DATA_SCIENCE", "AI"}
-VALID_LOCATIONS = {"POLAND", "US", "GERMANY", "ARGENTINA", "REMOTE"}
 
 
 async def subscribe_cmd(message: Message):
@@ -29,16 +27,16 @@ async def subscribe_cmd(message: Message):
     location = location.upper()
 
     # Validate category
-    if category not in VALID_CATEGORIES:
+    if category not in SEARCH_QUERIES:
         await message.answer(
             f"❌ Invalid category: `{category}`\n\n"
             "✅ Valid categories:\n"
-            f"{'\n'.join(VALID_CATEGORIES)}"
+            f"{'\n'.join(SEARCH_QUERIES.keys())}"
         )
         return
 
     # Validate location (basic - not empty)
-    if location not in VALID_LOCATIONS:
+    if location not in LOCATIONS:
         await message.answer(
             "❌ Please provide a valid country as a location.\n\n"
             "Examples: `Poland`, `Germany`, `Remote`, `UK`",
