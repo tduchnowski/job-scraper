@@ -3,17 +3,12 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from aiogram import types
 import aiohttp
-from sqlalchemy import and_, select
-from sqlalchemy.orm.strategy_options import selectinload
-from datetime import datetime, timedelta, timezone
 
 from jobscraper.bot import init_bot_and_dispatcher
-from jobscraper.scrapers.indeed import IndeedScraper
+from jobscraper.services.notification_processor import process_notification_batch
 from jobscraper.services.notification_service import NotificationService
-from jobscraper.storage.models import (
-    NotificationORM,
-)
-from jobscraper.storage.repository import JobRepository
+from jobscraper.services.scraping_orchestrator import scrape_all
+from jobscraper.storage.repository import JobRepository, NotificationRepository
 from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
@@ -54,10 +49,7 @@ async def scrape_jobs():
     """
     logger.info("Starting scheduled job scraping")
     try:
-        # scrape job boards
-        async with aiohttp.ClientSession() as session:
-            indeed = IndeedScraper(session)
-            jobs = await indeed.scrape_job_list("python developer", "Poland")
+        jobs = await scrape_all()
 
         async with SessionLocal() as session:
             # save new jobs
@@ -68,6 +60,7 @@ async def scrape_jobs():
             notification_service = NotificationService(session)
             new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
             await notification_service.create_for_new_jobs(new_jobs)
+            logger.info("Created new notifications")
 
         return {
             "ok": True,
@@ -84,28 +77,13 @@ async def scrape_jobs():
 async def dispatch_jobs():
     """
     Triggers sending new jobs to users
+
+    TODO: mark all jobs as processed in the end
     """
     async with SessionLocal() as session:
         # Get pending notifications (oldest first)
-        stmt = (
-            select(NotificationORM)
-            .where(
-                and_(
-                    NotificationORM.status == "pending",
-                    NotificationORM.next_attempt_at <= datetime.now(timezone.utc),
-                )
-            )
-            .order_by(
-                NotificationORM.created_at.asc()  # Oldest first
-            )
-            .limit(100)
-            .options(
-                selectinload(NotificationORM.user), selectinload(NotificationORM.job)
-            )
-        )
-
-        result = await session.execute(stmt)
-        notifications = result.scalars().all()
+        notification_repo = NotificationRepository(session)
+        notifications = await notification_repo.get_all_pending()
 
         if not notifications:
             logger.debug("No pending notifications")
@@ -116,79 +94,29 @@ async def dispatch_jobs():
         for notification in notifications:
             user_notifications[notification.user_id].append(notification)
 
-        sent_count = 0
-        failed_count = 0
+        total_sent_count = 0
+        total_failed_count = 0
 
         # Process each user
-        for user_id, user_nots in user_notifications.items():
-            user = user_nots[0].user  # Get user from first notification
+        for _, user_nots in user_notifications.items():
+            sent, failed = await process_notification_batch(
+                session, user_nots, notification_repo, app.state.bot
+            )
+            total_sent_count += sent
+            total_failed_count += failed
 
-            # Group jobs in batches of 5
-            job_batches = [user_nots[i : i + 5] for i in range(0, len(user_nots), 5)]
-
-            for batch in job_batches:
-                try:
-                    # Build message with multiple jobs
-                    jobs_text = "\n\n---\n\n".join(
-                        [
-                            f"📌 *{n.job.title}*\n"
-                            f"🏢 {n.job.company}\n"
-                            f"💰 {n.job.salary or 'Not specified'}\n"
-                            f"📍 {n.job.location}\n"
-                            f"🔗 [View]({n.job.url})"
-                            for n in batch
-                        ]
-                    )
-
-                    message = (
-                        f"🎉 *New job alert!*\n\n"
-                        f"{jobs_text}\n\n"
-                        f"Use /subscribe to manage preferences"
-                    )
-
-                    # Send to Telegram
-                    await app.state.bot.send_message(
-                        chat_id=user.chat_id,
-                        text=message,
-                        parse_mode="Markdown",
-                        disable_web_page_preview=True,
-                    )
-
-                    # Mark as sent
-                    for notification in batch:
-                        notification.status = "sent"
-                        notification.last_attempt_at = datetime.now(timezone.utc)
-
-                    sent_count += len(batch)
-                    logger.info(f"Sent {len(batch)} jobs to user {user_id}")
-
-                except Exception as e:
-                    logger.error(f"Failed to send to user {user_id}: {e}")
-
-                    # Mark as failed with retry logic
-                    for notification in batch:
-                        notification.attempts += 1
-                        notification.last_attempt_at = datetime.now(timezone.utc)
-
-                        if notification.attempts >= 3:
-                            notification.status = "failed"
-                            logger.warning(
-                                f"Notification {notification.id} failed after 3 attempts"
-                            )
-                        else:
-                            # Retry in exponential backoff: 5min, 30min, 2h
-                            delay = 60 * (2**notification.attempts)  # 2, 4, 8 minutes
-                            notification.next_attempt_at = datetime.now(
-                                timezone.utc
-                            ) + timedelta(seconds=delay)
-
-                    failed_count += len(batch)
-
-        await session.commit()
-
-        logger.info(f"Dispatch completed: {sent_count} sent, {failed_count} failed")
+        logger.info(
+            f"Dispatch completed: {total_sent_count} sent, {total_failed_count} failed"
+        )
         return {
             "ok": True,
-            "notifications_sent": sent_count,
-            "notifications_failed": failed_count,
+            "notifications_sent": total_sent_count,
+            "notifications_failed": total_failed_count,
         }
+
+
+@app.post("/clean")
+async def clean_db():
+    """
+    Cleans the database of all processed jobs and sent notifications
+    """

@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 import aiohttp
 from loguru import logger
-from jobscraper.models.job import Job, JobCategory
+from jobscraper.config.scraping_config import INDEED_DOMAINS
+from jobscraper.models.job import Job
 
 
 class IndeedScraper:
@@ -13,23 +14,25 @@ class IndeedScraper:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     }
 
-    def __init__(self, session: aiohttp.ClientSession | None):
-        self._base_url = "https://pl.indeed.com/jobs"
-        self._jobview_url = "https://pl.indeed.com/viewjob"
+    def __init__(self, session: aiohttp.ClientSession | None, location: str):
+        domain = INDEED_DOMAINS.get(location, "https://indeed.com")
+        self._base_url = f"{domain}/jobs"
+        self._jobview_url = f"{domain}/viewjob"
         self._session = session
+        self.location = location
 
-    async def scrape_job_list(self, query: str, location: str) -> list[Job]:
-        logger.info(f"Scraping Indeed, query={query}, location={location}")
-        resp = await self._fetch_job_list(query, location)
+    async def scrape_job_list(self, query: str) -> list[Job]:
+        logger.info(f"Scraping Indeed, query={query}, location={self.location}")
+        resp = await self._fetch_job_list(query)
         return self._parse_job_list(resp)
 
-    async def _fetch_job_list(self, query: str, location: str, radius=25) -> str:
+    async def _fetch_job_list(self, query: str, radius=25) -> str:
         if self._session is None:
             logger.warning("Session is None, so can't fetch job postings")
             return ""
         params = {
             "q": query,
-            "l": location,
+            "l": self.location,
             "radius": radius,
             "sort": "date",
         }
@@ -73,8 +76,6 @@ class IndeedScraper:
                     title=title,
                     company=company,
                     url=job_url,
-                    category=JobCategory.PYTHON,
-                    location="Poland",
                 )
             )
         logger.info(f"Scraped {len(result)} jobs")
