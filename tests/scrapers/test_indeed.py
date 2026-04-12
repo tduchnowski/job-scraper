@@ -5,9 +5,10 @@ from jobscraper.scrapers.indeed import IndeedScraper
 
 @pytest.fixture
 def scraper_poland():
-    # session is not used in parsing, so can be None
     return IndeedScraper(
-        session=None, semaphore=asyncio.Semaphore(1), location="POLAND"
+        session=None,
+        semaphore=asyncio.Semaphore(1),
+        location="POLAND",  # session is not used in parsing, so can be None
     )
 
 

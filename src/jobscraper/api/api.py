@@ -1,16 +1,12 @@
-import time
 from fastapi import FastAPI, Request, Response
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from aiogram import types
-import aiohttp
 
 from jobscraper.bot import init_bot_and_dispatcher
-from jobscraper.models.job import JobStatus
+from jobscraper.pipelines.scrape_pipeline import scrape_and_create_notifications
 from jobscraper.services.notification_processor import process_notification_batch
-from jobscraper.services.notification_service import NotificationService
-from jobscraper.services.scraping_orchestrator import get_scraping_scope, scrape_all
-from jobscraper.storage.repository import JobRepository, NotificationRepository
+from jobscraper.storage.repository import NotificationRepository
 from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
@@ -30,11 +26,11 @@ app = FastAPI(lifespan=lifespan)
 async def webhook(request: Request):
     """Handle Telegram webhook updates."""
     try:
-        # Parse update
+        # parse update
         update_data = await request.json()
         update = types.Update(**update_data)
 
-        # Feed to dispatcher
+        # feed to dispatcher
         await app.state.dp.feed_update(app.state.bot, update)
 
     except Exception as e:
@@ -50,39 +46,7 @@ async def scrape_jobs():
     This endpoint is intended for scheduler use only. Not publicly available.
     """
     logger.info("Starting scheduled job scraping")
-    try:
-        async with SessionLocal() as session:
-            # get new jobs
-            start_t = time.perf_counter()
-            search_scope = await get_scraping_scope(session)
-            jobs = await scrape_all(search_scope)
-            elapsed = time.perf_counter() - start_t
-            logger.info(f"Scraping done in {elapsed:.2f}")
-
-            # save new jobs
-            repo = JobRepository(session)
-            await repo.upsert_batch(jobs)
-
-            # create notifications for subscriptions
-            notification_service = NotificationService(session)
-            new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
-            await notification_service.create_for_new_jobs(new_jobs)
-            for job in new_jobs:
-                job.status = JobStatus.PROCESSED
-
-            # commit all changes
-            await session.commit()
-            logger.info("Created new notifications")
-
-        return {
-            "ok": True,
-            "jobs_scraped": len(jobs),
-        }
-    except aiohttp.ClientError as e:
-        logger.error(f"Network error during scraping: {e}")
-        return {"ok": False, "error": f"Network error: {str(e)}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    return await scrape_and_create_notifications()
 
 
 @app.post("/dispatch")
