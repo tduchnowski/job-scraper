@@ -1,3 +1,4 @@
+import asyncio
 from bs4 import BeautifulSoup
 import aiohttp
 from loguru import logger
@@ -6,35 +7,34 @@ from jobscraper.models.job import Job
 
 
 class IndeedScraper:
-    _HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.google.com/",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    }
-
-    def __init__(self, session: aiohttp.ClientSession | None, location: str):
+    def __init__(
+        self,
+        session: aiohttp.ClientSession | None,
+        semaphore: asyncio.Semaphore,
+        location: str,
+    ):
         domain = INDEED_DOMAINS.get(location, "https://indeed.com")
         self._base_url = f"{domain}/jobs"
         self._jobview_url = f"{domain}/viewjob"
         self._session = session
         self.location = location
+        self.sem = semaphore
 
     async def scrape_job_list(self, query: str) -> list[Job]:
-        logger.info(f"Scraping Indeed, query={query}, location={self.location}")
+        logger.debug(f"Scraping Indeed, query={query}, location={self.location}")
         resp = await self._fetch_job_list(query)
         if "captcha" in resp.lower():
-            print("CAPTCHA detected")
+            logger.warning("CAPTCHA DETECTED")
 
         if "unusual traffic" in resp.lower():
-            print("Blocked by anti-bot")
+            logger.warning("BLOCKED BY ANTI-BOT")
 
-        if "jobsearch-SerpJobCard" not in resp:
-            print("Expected job cards missing")
         jobs = self._parse_job_list(resp)
         if not jobs:
             logger.warning("Couldn't find any jobs on served html")
+        logger.info(
+            f"Scraping Indeed completed for query={query}, location={self.location}. Found {len(jobs)} jobs"
+        )
         return jobs
 
     async def _fetch_job_list(self, query: str, radius=25) -> str:
@@ -47,19 +47,9 @@ class IndeedScraper:
             "radius": radius,
             "sort": "date",
         }
-        async with self._session.get(
-            self._base_url, params=params, headers=self._HEADERS
-        ) as response:
-            print(
-                {
-                    "status": response.status,
-                    "url": str(response.url),
-                    "final_url": str(response.real_url),
-                    "length": len(await response.text()),
-                    "headers": dict(response.headers),
-                }
-            )
-            return await response.text()
+        async with self.sem:
+            async with self._session.get(self._base_url, params=params) as response:
+                return await response.text()
 
     def _parse_job_list(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
@@ -98,7 +88,6 @@ class IndeedScraper:
                     url=job_url,
                 )
             )
-        logger.info(f"Scraped {len(result)} jobs")
         return result
 
     # async def scrape_job_details(self, job_url: str) -> Dict[str, str]:

@@ -1,19 +1,34 @@
+from collections import defaultdict
 import random
 import asyncio
 import aiohttp
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from jobscraper.config.scraping_config import SEARCH_QUERIES
 from jobscraper.models.job import Job, JobCategory, JobLocation
 from jobscraper.scrapers.indeed import IndeedScraper
+from jobscraper.storage.models import UserSubscriptionORM
 
 
-async def scrape_all(
-    locations: list[str], search_queries: dict[str, list[str]]
-) -> list[Job]:
+async def scrape_all(scraping_scope: dict[str, list[str]]) -> list[Job]:
     all_jobs = []
     results = []
-    async with aiohttp.ClientSession() as session:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Mobile Safari/537.36 Indeed App 242.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "x-requested-with": "com.indeed.android.jobsearch",
+        "sec-ch-ua-platform": '"Android"',
+        "Referer": "https://www.indeed.com/",
+    }
+    async with aiohttp.ClientSession(
+        headers=headers, cookie_jar=aiohttp.CookieJar(unsafe=True)
+    ) as session:
+        semaphore = asyncio.Semaphore(5)
         tasks = [
-            scrape_domain(session, location, search_queries) for location in locations
+            scrape_domain(session, semaphore, location, scraping_scope[location])
+            for location in scraping_scope
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -26,16 +41,19 @@ async def scrape_all(
 
 
 async def scrape_domain(
-    session: aiohttp.ClientSession, location: str, search_queries: dict[str, list[str]]
+    session: aiohttp.ClientSession,
+    semaphore: asyncio.Semaphore,
+    location: str,
+    categories: list[str],
 ) -> list[Job]:
     domain_jobs: list[Job] = []
-    indeed = IndeedScraper(session, location=location)
-    for category in search_queries:
-        for query in search_queries[category]:
+    indeed = IndeedScraper(session, semaphore, location=location)
+    for category in categories:
+        for query in SEARCH_QUERIES[category]:
             try:
                 jobs = await scrape_one(indeed, location, category, query)
                 domain_jobs.extend(jobs)
-                await asyncio.sleep(random.uniform(1.0, 2.0))
+                await asyncio.sleep(random.uniform(1.0, 5.0))
             except Exception as e:
                 logger.error(str(e))
     return domain_jobs
@@ -48,7 +66,17 @@ async def scrape_one(
     for job in jobs:
         job.category = JobCategory(category)
         job.location = JobLocation(location)
-    logger.info(
-        f"Finished scrapping for location={location}, category={category}, query={query}"
-    )
     return jobs
+
+
+async def get_scraping_scope(session: AsyncSession) -> dict[str, list[str]]:
+    """
+    Determinates unique combinations of locations and categories and groups them
+    into a dict where each location is assigned a list of categories
+    """
+    scope = defaultdict(list)
+    stmt = select(UserSubscriptionORM.location, UserSubscriptionORM.category).distinct()
+    unique_loc_cats = await session.execute(stmt)
+    for loc, cat in unique_loc_cats:
+        scope[loc].append(cat.value)
+    return scope

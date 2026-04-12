@@ -2,7 +2,6 @@ from typing import Sequence
 from sqlalchemy import and_, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from jobscraper.models.job import JobStatus
 from jobscraper.storage.models import (
     JobORM,
     NotificationORM,
@@ -30,15 +29,13 @@ class NotificationService:
             )
         )
         user_ids = (await self.session.execute(query)).scalars().all()
-        print(user_ids)
         if not user_ids:
             return 0
 
-        # INSERT OR IGNORE
         stmt = (
             insert(NotificationORM)
             .values([{"user_id": uid, "job_id": job.id} for uid in user_ids])
-            .prefix_with("OR IGNORE")
+            .prefix_with("OR IGNORE")  # INSERT OR IGNORE
         )
         await self.session.execute(stmt)
 
@@ -46,5 +43,3 @@ class NotificationService:
         """Create notifications for all NEW jobs. Returns total notifications created."""
         for job in jobs:
             await self.create_for_job(job)
-            job.status = JobStatus.PROCESSED
-            await self.session.commit()

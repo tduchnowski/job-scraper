@@ -43,7 +43,6 @@ class JobRepository:
         jobs_orm = [job_to_orm(job) for job in jobs]
         for job_orm in jobs_orm:
             await self.session.merge(job_orm)
-        await self.session.commit()
         return len(jobs_orm)
 
     async def get(self, job_id: str) -> Optional[JobORM]:

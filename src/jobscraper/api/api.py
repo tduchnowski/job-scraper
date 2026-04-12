@@ -6,10 +6,10 @@ from aiogram import types
 import aiohttp
 
 from jobscraper.bot import init_bot_and_dispatcher
-from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
+from jobscraper.models.job import JobStatus
 from jobscraper.services.notification_processor import process_notification_batch
 from jobscraper.services.notification_service import NotificationService
-from jobscraper.services.scraping_orchestrator import scrape_all
+from jobscraper.services.scraping_orchestrator import get_scraping_scope, scrape_all
 from jobscraper.storage.repository import JobRepository, NotificationRepository
 from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
@@ -51,12 +51,14 @@ async def scrape_jobs():
     """
     logger.info("Starting scheduled job scraping")
     try:
-        start_t = time.perf_counter()
-        jobs = await scrape_all(LOCATIONS, SEARCH_QUERIES)
-        elapsed = time.perf_counter() - start_t
-        logger.info(f"Scraping done in {elapsed:.2f}")
-
         async with SessionLocal() as session:
+            # get new jobs
+            start_t = time.perf_counter()
+            search_scope = await get_scraping_scope(session)
+            jobs = await scrape_all(search_scope)
+            elapsed = time.perf_counter() - start_t
+            logger.info(f"Scraping done in {elapsed:.2f}")
+
             # save new jobs
             repo = JobRepository(session)
             await repo.upsert_batch(jobs)
@@ -65,6 +67,11 @@ async def scrape_jobs():
             notification_service = NotificationService(session)
             new_jobs = await repo.get_new_jobs()  # fetch the unprocessed jobs
             await notification_service.create_for_new_jobs(new_jobs)
+            for job in new_jobs:
+                job.status = JobStatus.PROCESSED
+
+            # commit all changes
+            await session.commit()
             logger.info("Created new notifications")
 
         return {
@@ -82,8 +89,6 @@ async def scrape_jobs():
 async def dispatch_jobs():
     """
     Triggers sending new jobs to users
-
-    TODO: mark all jobs as processed in the end
     """
     async with SessionLocal() as session:
         # Get pending notifications (oldest first)
