@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from jobscraper.scrapers.indeed import IndeedScraper
 
@@ -5,7 +6,9 @@ from jobscraper.scrapers.indeed import IndeedScraper
 @pytest.fixture
 def scraper_poland():
     # session is not used in parsing, so can be None
-    return IndeedScraper(session=None, location="POLAND")
+    return IndeedScraper(
+        session=None, semaphore=asyncio.Semaphore(1), location="POLAND"
+    )
 
 
 def test_parse_job_list_basic(scraper_poland):
