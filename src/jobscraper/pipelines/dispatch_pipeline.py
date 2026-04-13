@@ -161,7 +161,7 @@ async def process_notification_batch(
                         failed_count += len(batch)
                     except (TelegramBadRequest, TelegramAPIError) as e:
                         logger.warning(
-                            f"Failed to send to user. {user.id}: {e} ; batch={batch}"
+                            f"Failed to send to user. {user.id}: {e} ; batch={[job.id for job in batch]}"
                         )
                         for notification in batch:
                             notification_repo.mark_failed(
