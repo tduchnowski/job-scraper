@@ -83,6 +83,10 @@ class UserSubscriptionORM(Base):
 
     # Relationships
     user: Mapped["UserORM"] = relationship(back_populates="subscriptions")
+    # notifications: Mapped[list["NotificationORM"]] = relationship(
+    #     back_populates="subscription",
+    #     cascade="all, delete-orphan"
+    # )
 
     __table_args__ = (
         UniqueConstraint(
@@ -103,6 +107,15 @@ class NotificationORM(Base):
 
     job_id: Mapped[int] = mapped_column(
         ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "user_subscriptions.id",
+            name="fk_notifications_subscription_id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
 
@@ -133,8 +146,13 @@ class NotificationORM(Base):
         nullable=False,
     )
 
+    # --- relationships ---
     user: Mapped["UserORM"] = relationship(foreign_keys=[user_id])
     job: Mapped["JobORM"] = relationship(foreign_keys=[job_id])
+    subscription: Mapped["UserSubscriptionORM"] = relationship(
+        foreign_keys=[subscription_id],
+        # back_populates="notifications"
+    )
 
     # --- constraints ---
     __table_args__ = (

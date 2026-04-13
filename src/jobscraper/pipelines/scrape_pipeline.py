@@ -73,14 +73,12 @@ async def scrape_and_create_notifications():
                 await session.rollback()
                 result.error = f"Network error: {str(e)}"
             except Exception as e:
-                logger.error(f"Scraping pipeline failed: {e}", exc_info=True)
+                logger.exception(f"Scraping pipeline failed: {e}")
                 await session.rollback()
                 result.error = str(e)
-            finally:
-                return result
     except SQLAlchemyError as e:
         result.error = f"Session creation failed: {str(e)}"
-        return result
+    return result
 
 
 async def scrape_all(scraping_scope: dict[str, list[str]]) -> list[Job]:

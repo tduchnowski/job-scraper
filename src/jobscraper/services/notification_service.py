@@ -17,7 +17,7 @@ class NotificationService:
     async def create_for_job(self, job: JobORM):
         """Create notifications for all users matching a job. Returns count"""
         query = (
-            select(UserORM.id)
+            select(UserORM.id, UserSubscriptionORM.id)
             .join(UserSubscriptionORM, UserSubscriptionORM.user_id == UserORM.id)
             .where(
                 and_(
@@ -28,13 +28,18 @@ class NotificationService:
                 )
             )
         )
-        user_ids = (await self.session.execute(query)).scalars().all()
-        if not user_ids:
+        user_and_subscription_ids = (await self.session.execute(query)).all()
+        if not user_and_subscription_ids:
             return 0
 
         stmt = (
             insert(NotificationORM)
-            .values([{"user_id": uid, "job_id": job.id} for uid in user_ids])
+            .values(
+                [
+                    {"user_id": uid, "job_id": job.id, "subscription_id": sub_id}
+                    for uid, sub_id in user_and_subscription_ids
+                ]
+            )
             .prefix_with("OR IGNORE")  # INSERT OR IGNORE
         )
         await self.session.execute(stmt)
