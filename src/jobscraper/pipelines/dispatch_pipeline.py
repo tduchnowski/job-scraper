@@ -9,6 +9,7 @@ from jobscraper.storage.models import NotificationORM
 from jobscraper.storage.repository import NotificationRepository
 from jobscraper.storage.session import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
+from aiolimiter import AsyncLimiter
 from aiogram.exceptions import (
     TelegramAPIError,
     TelegramBadRequest,
@@ -88,13 +89,15 @@ async def process_notification_batch(
     user = user_nots[0].user  # Get user from first notification
     sent_count = 0
     failed_count = 0
+    user_limiter = AsyncLimiter(1, 1)
 
     # Group jobs in batches of 5
-    job_batches = [user_nots[i : i + 5] for i in range(0, len(user_nots), 5)]
+    job_batches = [user_nots[i : i + 10] for i in range(0, len(user_nots), 10)]
     for batch in job_batches:
         try:
             # Build message with multiple jobs
-            await send_batch_notification(bot, user, batch)
+            async with user_limiter:
+                await send_batch_notification(bot, user, batch)
 
             for notification in batch:
                 await notification_repo.mark_successful(notification)
