@@ -1,13 +1,10 @@
 from fastapi import FastAPI, Request, Response
-from collections import defaultdict
 from contextlib import asynccontextmanager
 from aiogram import types
 
 from jobscraper.bot import init_bot_and_dispatcher
+from jobscraper.pipelines.dispatch_pipeline import dispatch_notifications
 from jobscraper.pipelines.scrape_pipeline import scrape_and_create_notifications
-from jobscraper.services.notification_processor import process_notification_batch
-from jobscraper.storage.repository import NotificationRepository
-from jobscraper.storage.session import SessionLocal
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
 
@@ -54,39 +51,8 @@ async def dispatch_jobs():
     """
     Triggers sending new jobs to users
     """
-    async with SessionLocal() as session:
-        # Get pending notifications (oldest first)
-        notification_repo = NotificationRepository(session)
-        notifications = await notification_repo.get_all_pending()
-
-        if not notifications:
-            logger.debug("No pending notifications")
-            return {"ok": True, "notifications_sent": 0}
-
-        # Group by user
-        user_notifications = defaultdict(list)
-        for notification in notifications:
-            user_notifications[notification.user_id].append(notification)
-
-        total_sent_count = 0
-        total_failed_count = 0
-
-        # Process each user
-        for _, user_nots in user_notifications.items():
-            sent, failed = await process_notification_batch(
-                session, user_nots, notification_repo, app.state.bot
-            )
-            total_sent_count += sent
-            total_failed_count += failed
-
-        logger.info(
-            f"Dispatch completed: {total_sent_count} sent, {total_failed_count} failed"
-        )
-        return {
-            "ok": True,
-            "notifications_sent": total_sent_count,
-            "notifications_failed": total_failed_count,
-        }
+    logger.info("Notifications dispatch started")
+    return await dispatch_notifications(app.state.bot)
 
 
 @app.post("/clean")
@@ -94,3 +60,4 @@ async def clean_db():
     """
     Cleans the database of all processed jobs and sent notifications
     """
+    pass

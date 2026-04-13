@@ -8,6 +8,7 @@ class User(BaseModel):
     id: int = Field(...)
     chat_id: int = Field(...)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_active: bool = True
 
     # for debugging
     username: Optional[str] = None

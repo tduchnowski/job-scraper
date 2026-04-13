@@ -3,11 +3,19 @@ from dataclasses import dataclass
 from typing import Optional
 from aiogram import Bot
 from loguru import logger
+from sqlalchemy.exc import SQLAlchemyError
 from jobscraper.bot.messages import send_batch_notification
 from jobscraper.storage.models import NotificationORM
 from jobscraper.storage.repository import NotificationRepository
 from jobscraper.storage.session import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNotFound,
+    TelegramRetryAfter,
+)
 
 
 @dataclass()
@@ -21,39 +29,54 @@ class DispatchResult:
 
 
 async def dispatch_notifications(bot: Bot):
-    async with SessionLocal() as session:
-        # Get pending notifications (oldest first)
-        notification_repo = NotificationRepository(session)
-        notifications = await notification_repo.get_all_pending()
+    result = DispatchResult()
+    try:
+        async with SessionLocal() as session:
+            notifications = []
+            notification_repo = NotificationRepository(session)
+            try:
+                # Get pending notifications (oldest first)
+                notifications = await notification_repo.get_all_pending()
+            except SQLAlchemyError as e:
+                logger.error(f"Failed fetching pending notifications. {str(e)}")
+                return result
 
-        if not notifications:
-            logger.debug("No pending notifications")
-            return {"ok": True, "notifications_sent": 0}
+            if not notifications:
+                logger.debug("No pending notifications")
+                result.ok = True
+                return result
 
-        # Group by user
-        user_notifications = defaultdict(list)
-        for notification in notifications:
-            user_notifications[notification.user_id].append(notification)
+            # Group by user
+            user_notifications = defaultdict(list)
+            for notification in notifications:
+                user_notifications[notification.user_id].append(notification)
 
-        total_sent_count = 0
-        total_failed_count = 0
+            total_sent_count = 0
+            total_failed_count = 0
 
-        # Process each user
-        for _, user_nots in user_notifications.items():
-            sent, failed = await process_notification_batch(
-                session, user_nots, notification_repo, bot
+            # Process each user
+            for _, user_nots in user_notifications.items():
+                sent, failed = await process_notification_batch(
+                    session, user_nots, notification_repo, bot
+                )
+                total_sent_count += sent
+                total_failed_count += failed
+
+            result.notifications_sent = total_sent_count
+            result.notifications_failed = total_failed_count
+            result.total_notifications = total_sent_count + total_failed_count
+            result.users_processed = len(user_notifications)
+            result.ok = True
+
+            logger.info(
+                f"Dispatch completed: {total_sent_count} sent, {total_failed_count} failed"
             )
-            total_sent_count += sent
-            total_failed_count += failed
-
-        logger.info(
-            f"Dispatch completed: {total_sent_count} sent, {total_failed_count} failed"
-        )
-        return {
-            "ok": True,
-            "notifications_sent": total_sent_count,
-            "notifications_failed": total_failed_count,
-        }
+            return result
+    except SQLAlchemyError as e:
+        msg = f"Session creation failed: {str(e)}"
+        logger.error(msg)
+        result.error = msg
+        return result
 
 
 async def process_notification_batch(
@@ -78,14 +101,44 @@ async def process_notification_batch(
 
             sent_count += len(batch)
             logger.info(f"Sent {len(batch)} jobs to user {user.id}")
-
+        except TelegramForbiddenError:
+            logger.warning(f"Bot blocked by user {user.id}")
+            user.is_active = False
+            for notification in batch:
+                notification_repo.mark_permanently_failed(notification)
+            failed_count += len(batch)
+            break
+        except TelegramNotFound:
+            logger.warning(f"Chat not found for user {user.id}")
+            user.is_active = False
+            for notification in batch:
+                notification_repo.mark_permanently_failed(notification)
+            failed_count += len(batch)
+            break
+        except TelegramRetryAfter as e:
+            logger.warning(
+                f"Telegram rate limit for user {user.id}. Retry after {e.retry_after} seconds"
+            )
+            for notification in batch:
+                notification_repo.mark_failed(notification, retry_delay=e.retry_after)
+            failed_count += len(batch)
+        except (TelegramBadRequest, TelegramAPIError) as e:
+            logger.warning(f"Failed to send to user {user.id}: {e}")
+            for notification in batch:
+                notification_repo.mark_failed(notification)
+            failed_count += len(batch)
         except Exception as e:
             logger.error(f"Failed to send to user {user.id}: {e}")
 
             for notification in batch:
-                await notification_repo.mark_failed(notification)
+                notification_repo.mark_failed(notification)
 
             failed_count += len(batch)
         finally:
-            await session.commit()
+            try:
+                await session.commit()
+            except SQLAlchemyError as e:
+                logger.error(f"Failed to commit batch for user {user.id}: {e}")
+                await session.rollback()
+                raise
     return sent_count, failed_count

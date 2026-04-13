@@ -4,7 +4,9 @@ from jobscraper.storage.models import NotificationORM, UserORM
 
 
 async def send_batch_notification(
-    bot: Bot, user: UserORM, batch: list[NotificationORM]
+    bot: Bot,
+    user: UserORM,
+    batch: list[NotificationORM],
 ):
     jobs_text = "\n\n---\n\n".join(
         [

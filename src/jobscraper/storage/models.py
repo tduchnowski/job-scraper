@@ -54,6 +54,7 @@ class UserORM(Base):
     created_at: Mapped[datetime] = mapped_column(
         nullable=False, default=lambda: datetime.now(timezone.utc)
     )
+    is_active: Mapped[bool] = mapped_column(nullable=False, server_default="1")
     username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_interaction: Mapped[datetime] = mapped_column(
         nullable=False, default=lambda: datetime.now(timezone.utc)

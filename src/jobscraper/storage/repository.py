@@ -94,15 +94,25 @@ class NotificationRepository:
         notification.status = "sent"
         notification.last_attempt_at = datetime.now(timezone.utc)
 
-    async def mark_failed(self, notification: NotificationORM):
+    def mark_failed(
+        self, notification: NotificationORM, retry_delay: float | None = None
+    ):
         notification.attempts += 1
         notification.last_attempt_at = datetime.now(timezone.utc)
 
         if notification.attempts >= 3:
-            notification.status = "failed"
+            self.mark_permanently_failed(notification)
         else:
+            delay = retry_delay
+            if retry_delay is None:
+                delay = 60 * (2**notification.attempts)  # 2, 4, 8 minutes
+            else:
+                delay = retry_delay
+
             # Retry in exponential backoff: 5min, 30min, 2h
-            delay = 60 * (2**notification.attempts)  # 2, 4, 8 minutes
             notification.next_attempt_at = datetime.now(timezone.utc) + timedelta(
                 seconds=delay
             )
+
+    def mark_permanently_failed(self, notification: NotificationORM):
+        notification.status = "failed"
