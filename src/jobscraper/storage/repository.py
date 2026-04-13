@@ -48,12 +48,11 @@ class JobRepository:
     async def get(self, job_id: str) -> Optional[JobORM]:
         return await self.session.get(JobORM, job_id)
 
-    async def get_new_jobs(self, limit: int = 100) -> Sequence[JobORM]:
+    async def get_new_jobs(self) -> Sequence[JobORM]:
         query = (
             select(JobORM)
             .where(JobORM.status == JobStatus.NEW)
             .order_by(JobORM.created_at.asc())
-            .limit(limit)
         )
         res = await self.session.execute(query)
         return res.scalars().all()
