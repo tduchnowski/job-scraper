@@ -36,7 +36,7 @@ def get_db_url():
     if not all([host, user, password, db]):
         raise ValueError("Missing environment variables for database setup")
 
-    if os.getenv("ENVIRONMENT") == "prod":
-        return f"postgresql+asyncpg://{user}:{password}@{host}/{db}?sslmode=require&channel_binding=require"
+    if os.getenv("ENVIRONMENT") == "deploy":
+        return f"postgresql+asyncpg://{user}:{password}@{host}/{db}?ssl=require"
     else:
         return f"postgresql+asyncpg://{user}:{password}@{host}/{db}"

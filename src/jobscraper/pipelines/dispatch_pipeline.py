@@ -84,9 +84,6 @@ async def dispatch_notifications(bot: Bot):
             result.users_processed = len(user_notifications)
             result.ok = True
 
-            logger.info(
-                f"Dispatch completed: {total_sent_count} sent, {total_failed_count} failed"
-            )
             return result
     except SQLAlchemyError as e:
         msg = f"Session creation failed: {str(e)}"

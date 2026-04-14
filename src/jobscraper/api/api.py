@@ -48,7 +48,11 @@ async def scrape_jobs():
     This endpoint is intended for scheduler use only. Not publicly available.
     """
     logger.info("Starting scheduled job scraping")
-    return await scrape_and_create_notifications()
+    res = await scrape_and_create_notifications()
+    logger.info(
+        f"Scraping pipeline completed. Found {res.total_jobs_found}. Created new notifications for {res.new_jobs_processed} jobs"
+    )
+    return res
 
 
 @app.post("/dispatch")
@@ -57,7 +61,11 @@ async def dispatch_jobs():
     Triggers sending new jobs to users
     """
     logger.info("Notifications dispatch started")
-    return await dispatch_notifications(app.state.bot)
+    res = await dispatch_notifications(app.state.bot)
+    logger.info(
+        f"Dispatch completed: {res.notifications_sent} sent, {res.notifications_failed} failed"
+    )
+    return res
 
 
 @app.post("/clean")
