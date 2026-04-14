@@ -18,6 +18,10 @@ def set_session_local():
     engine = create_async_engine(
         db_url,
         echo=False,  # set True for debugging
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=5,
+        max_overflow=5,
     )
 
     _session_local = async_sessionmaker(
