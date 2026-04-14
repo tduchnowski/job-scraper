@@ -5,7 +5,7 @@ from sqlalchemy import and_, select
 
 from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
 from jobscraper.storage.models import UserORM, UserSubscriptionORM
-from jobscraper.storage.session import SessionLocal
+from jobscraper.storage.session import get_session_local
 
 
 async def subscribe_cmd(message: Message):
@@ -44,7 +44,7 @@ async def subscribe_cmd(message: Message):
         return
 
     # Save subscription
-    async with SessionLocal() as session:
+    async with get_session_local()() as session:
         # Check if user exists, create if not
         if not message.from_user:
             return

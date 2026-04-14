@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from jobscraper.bot.messages import send_batch_notification
 from jobscraper.storage.models import NotificationORM
 from jobscraper.storage.repository import NotificationRepository
-from jobscraper.storage.session import SessionLocal
+from jobscraper.storage.session import get_session_local
 from aiolimiter import AsyncLimiter
 from aiogram.exceptions import (
     TelegramAPIError,
@@ -33,7 +33,7 @@ class DispatchResult:
 async def dispatch_notifications(bot: Bot):
     result = DispatchResult()
     try:
-        async with SessionLocal() as session:
+        async with get_session_local()() as session:
             notifications = []
             notification_repo = NotificationRepository(session)
             try:
@@ -41,6 +41,8 @@ async def dispatch_notifications(bot: Bot):
                 notifications = await notification_repo.get_all_pending()
             except SQLAlchemyError as e:
                 logger.error(f"Failed fetching pending notifications. {str(e)}")
+                result.ok = False
+                result.error = str(e)
                 return result
 
             if not notifications:
@@ -107,7 +109,7 @@ async def process_notification_batch(
     user_limiter = AsyncLimiter(1, 1)
     try:
         async with sem:
-            async with SessionLocal() as session:
+            async with get_session_local()() as session:
                 # TODO: reattach a user and notifications right away to this session
 
                 # Group jobs in batches of 5

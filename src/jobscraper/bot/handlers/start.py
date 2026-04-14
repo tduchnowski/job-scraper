@@ -2,12 +2,12 @@ from datetime import datetime, timezone
 from aiogram.types import Message
 from loguru import logger
 from jobscraper.storage.models import UserORM
-from jobscraper.storage.session import SessionLocal
+from jobscraper.storage.session import get_session_local
 
 
 async def start_cmd(message: Message):
     # Save user to database
-    async with SessionLocal() as session:
+    async with get_session_local()() as session:
         # Check if user exists
         if not message.from_user:
             return

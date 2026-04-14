@@ -1,5 +1,6 @@
 from typing import Sequence
-from sqlalchemy import and_, insert, select
+from sqlalchemy import and_, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobscraper.storage.models import (
@@ -40,7 +41,7 @@ class NotificationService:
                     for uid, sub_id in user_and_subscription_ids
                 ]
             )
-            .prefix_with("OR IGNORE")  # INSERT OR IGNORE
+            .on_conflict_do_nothing()
         )
         await self.session.execute(stmt)
 

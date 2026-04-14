@@ -14,7 +14,7 @@ from jobscraper.scrapers.indeed import IndeedScraper
 from jobscraper.services.notification_service import NotificationService
 from jobscraper.storage.models import UserSubscriptionORM
 from jobscraper.storage.repository import JobRepository
-from jobscraper.storage.session import SessionLocal
+from jobscraper.storage.session import get_session_local
 from sqlalchemy.exc import SQLAlchemyError
 
 
@@ -31,7 +31,7 @@ class ScrapeResult:
 async def scrape_and_create_notifications():
     result = ScrapeResult()
     try:
-        async with SessionLocal() as session:
+        async with get_session_local()() as session:
             try:
                 # get new jobs
                 start_t = time.perf_counter()

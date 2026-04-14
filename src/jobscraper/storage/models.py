@@ -1,13 +1,14 @@
 from sqlalchemy import (
     Index,
+    Integer,
     String,
     Text,
     Boolean,
-    JSON,
     ForeignKey,
     UniqueConstraint,
     Enum as SAEnum,
 )
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -31,17 +32,21 @@ class JobORM(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     salary: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     job_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    skills: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    skills: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
     seniority: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     status: Mapped[JobStatus] = mapped_column(SAEnum(JobStatus), default=JobStatus.NEW)
 
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.fromtimestamp(0, tz=timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     scraped_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
@@ -52,12 +57,16 @@ class UserORM(Base):
     id: Mapped[int] = mapped_column(primary_key=True)  # Telegram user_id
     chat_id: Mapped[int] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default="1")
     username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_interaction: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships
@@ -69,16 +78,20 @@ class UserORM(Base):
 class UserSubscriptionORM(Base):
     __tablename__ = "user_subscriptions"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     category: Mapped[JobCategory] = mapped_column(SAEnum(JobCategory), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_notified_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.fromtimestamp(0, tz=timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, default=lambda: datetime.now(timezone.utc)
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships
@@ -98,14 +111,14 @@ class UserSubscriptionORM(Base):
 class NotificationORM(Base):
     __tablename__ = "notifications"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    job_id: Mapped[int] = mapped_column(
+    job_id: Mapped[str] = mapped_column(
         ForeignKey("jobs.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -132,16 +145,19 @@ class NotificationORM(Base):
 
     # --- retry control ---
     next_attempt_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     last_attempt_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True),
         nullable=True,
     )
 
     # --- timestamps ---
     created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )

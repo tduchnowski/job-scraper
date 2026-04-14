@@ -3,8 +3,10 @@ from contextlib import asynccontextmanager
 from aiogram import types
 
 from jobscraper.bot import init_bot_and_dispatcher
+from jobscraper.config.env import setup_env
 from jobscraper.pipelines.dispatch_pipeline import dispatch_notifications
 from jobscraper.pipelines.scrape_pipeline import scrape_and_create_notifications
+from jobscraper.storage.session import set_session_local
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
 
@@ -12,6 +14,9 @@ from loguru import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logger()
+    setup_env()
+    set_session_local()
+
     app.state.bot, app.state.dp = init_bot_and_dispatcher()
     yield
 
@@ -31,7 +36,7 @@ async def webhook(request: Request):
         await app.state.dp.feed_update(app.state.bot, update)
 
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.exception(f"Webhook error: {e}")
     finally:
         return Response(status_code=200)  # Always return 200 to Telegram
 
