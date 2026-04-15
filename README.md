@@ -5,6 +5,7 @@
 A distributed job notification system that scrapes job boards and delivers personalized alerts via Telegram.
 The system is designed to handle asynchronous scraping, fair notification distribution across users, and external API rate limits in a serverless environment.
 
+<img src="./itjobsbot.png" width="400" height="600"/>
 
 ## Architecture
 
