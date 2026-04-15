@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Sequence, Tuple
 
@@ -95,7 +95,7 @@ class NotificationRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_all_pending(self) -> Sequence[NotificationORM]:
+    async def get_all_pending(self, limit=2000) -> Sequence[NotificationORM]:
         stmt = (
             select(NotificationORM)
             .where(
@@ -104,10 +104,8 @@ class NotificationRepository:
                     NotificationORM.next_attempt_at <= datetime.now(timezone.utc),
                 )
             )
-            .order_by(
-                NotificationORM.created_at.asc()  # Oldest first
-            )
-            .limit(100)
+            .order_by(func.random())
+            .limit(limit)
             .options(
                 selectinload(NotificationORM.user), selectinload(NotificationORM.job)
             )

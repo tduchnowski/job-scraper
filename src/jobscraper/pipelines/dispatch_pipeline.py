@@ -54,6 +54,7 @@ async def dispatch_notifications(bot: Bot):
             user_notifications = defaultdict(list)
             for notification in notifications:
                 user_notifications[notification.user_id].append(notification)
+            user_notifications = select_notifications_to_send(user_notifications)
 
             total_sent_count = 0
             total_failed_count = 0
@@ -190,3 +191,24 @@ async def process_notification_batch(
             f"Couldn't create a new session for sending messages to user {user.id}"
         )
     return sent_count, failed_count
+
+
+def select_notifications_to_send(
+    user_notifications: dict[int, list[NotificationORM]],
+    notifications_per_message=10,
+    all_notifications_limit=2000,
+) -> dict[int, list[NotificationORM]]:
+    # my version of round robin. user_notifications are already random to begin with
+
+    to_send: dict[int, list[NotificationORM]] = defaultdict(list)
+    max_will_send = min(
+        all_notifications_limit, len(user_notifications) * notifications_per_message
+    )
+    users_mapping = {i: user_id for i, user_id in enumerate(user_notifications.keys())}
+    users_n = len(user_notifications)  # users appearing in user_notifications
+    for i in range(max_will_send):
+        user_id = users_mapping[i % users_n]
+        queue = user_notifications[user_id]
+        if queue:
+            to_send[user_id].append(queue.pop())
+    return to_send

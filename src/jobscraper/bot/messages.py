@@ -124,7 +124,7 @@ def are_args_valid(text: str) -> tuple[bool, str]:
 
     # Validate location
     if location not in LOCATIONS:
-        return False, ("❌ Please provide a valid country as a location.\n\n")
+        return False, ("❌ Please provide a supported country as a location.\n\n")
     return True, ""
 
 
