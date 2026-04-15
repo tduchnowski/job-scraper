@@ -142,7 +142,11 @@ async def get_scraping_scope(session: AsyncSession) -> dict[str, list[str]]:
     into a dict where each location is assigned a list of categories
     """
     scope = defaultdict(list)
-    stmt = select(UserSubscriptionORM.location, UserSubscriptionORM.category).distinct()
+    stmt = (
+        select(UserSubscriptionORM.location, UserSubscriptionORM.category)
+        .where(UserSubscriptionORM.is_active)
+        .distinct()
+    )
     unique_loc_cats = await session.execute(stmt)
     for loc, cat in unique_loc_cats:
         scope[loc].append(cat.value)
