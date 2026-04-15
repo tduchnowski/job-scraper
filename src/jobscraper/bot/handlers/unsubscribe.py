@@ -12,6 +12,7 @@ async def unsubscribe_cmd(message: Message):
     args_ok, error_msg = are_args_valid(message.text)
     if not args_ok:
         await message.answer(error_msg, parse_mode="markdown")
+        return
     _, category, location = message.text.split()
     category, location = category.upper(), location.upper()
 
