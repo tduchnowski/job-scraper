@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from aiogram.types import Message
 from loguru import logger
+from jobscraper.bot.messages import get_start_text
 from jobscraper.storage.models import UserORM
 from jobscraper.storage.session import get_session_local
 
@@ -12,7 +13,6 @@ async def start_cmd(message: Message):
         if not message.from_user:
             return
         user = await session.get(UserORM, message.from_user.id)
-
         if not user:
             # Create new user
             user = UserORM(
@@ -31,6 +31,4 @@ async def start_cmd(message: Message):
             await session.commit()
             logger.debug(f"User updated: {user.id}")
 
-    await message.answer(
-        "Hi! Welcome to Job Notifier Bot. Use /subscribe to get job notifications."
-    )
+    await message.answer(get_start_text(), parse_mode="markdown")

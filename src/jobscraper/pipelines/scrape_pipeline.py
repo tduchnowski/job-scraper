@@ -61,9 +61,6 @@ async def scrape_and_create_notifications():
                 await session.commit()  # commit all changes
                 result.ok = True
                 result.new_jobs_processed = len(new_jobs)
-                logger.info(
-                    f"Scraping pipeline completed. Created new notifications for {len(new_jobs)} jobs"
-                )
             except SQLAlchemyError as e:
                 logger.error(f"Database error getting scraping scope: {e}")
                 await session.rollback()

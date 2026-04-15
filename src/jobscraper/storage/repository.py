@@ -7,7 +7,7 @@ from typing import Optional, Sequence, Tuple
 from sqlalchemy.orm.strategy_options import selectinload
 
 from jobscraper.models.job import Job, JobStatus
-from jobscraper.storage.models import JobORM, NotificationORM
+from jobscraper.storage.models import JobORM, NotificationORM, UserSubscriptionORM
 from jobscraper.storage.mappers import job_to_orm
 
 
@@ -64,6 +64,33 @@ class JobRepository:
         await self.session.commit()
 
 
+class UserSubscriptionRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_user_subscriptions(
+        self, user_id: int
+    ) -> Sequence[UserSubscriptionORM]:
+        stmt = select(UserSubscriptionORM).where(
+            and_(UserSubscriptionORM.user_id == user_id),
+            UserSubscriptionORM.is_active,
+        )
+        res = await self.session.execute(stmt)
+        return res.scalars().all()
+
+    async def find_subscription(
+        self, user_id: int, category: str, location: str
+    ) -> UserSubscriptionORM | None:
+        stmt = select(UserSubscriptionORM).where(
+            and_(UserSubscriptionORM.user_id == user_id),
+            UserSubscriptionORM.is_active,
+            UserSubscriptionORM.category == category,
+            UserSubscriptionORM.location == location,
+        )
+        res = await self.session.execute(stmt)
+        return res.scalar_one_or_none()
+
+
 class NotificationRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -115,3 +142,11 @@ class NotificationRepository:
 
     def mark_permanently_failed(self, notification: NotificationORM):
         notification.status = "failed"
+
+
+# class UserRepository:
+#     def __init__(self, session: AsyncSession):
+#         self.session = session
+#
+#     def
+#
