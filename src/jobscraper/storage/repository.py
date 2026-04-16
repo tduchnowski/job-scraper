@@ -104,14 +104,27 @@ class UserSubscriptionRepository:
         res = await self.session.execute(stmt)
         return res.scalars().all()
 
+    async def create_subscription(self, user_id: int, category: str, location: str):
+        subscription = UserSubscriptionORM(
+            user_id=user_id,
+            category=category,
+            location=location,
+            is_active=True,
+            created_at=datetime.now(timezone.utc),
+            last_notified_at=datetime.fromtimestamp(0, tz=timezone.utc),
+        )
+        self.session.add(subscription)
+
     async def find_subscription(
         self, user_id: int, category: str, location: str
     ) -> UserSubscriptionORM | None:
         stmt = select(UserSubscriptionORM).where(
-            and_(UserSubscriptionORM.user_id == user_id),
-            UserSubscriptionORM.is_active,
-            UserSubscriptionORM.category == category,
-            UserSubscriptionORM.location == location,
+            and_(
+                UserSubscriptionORM.user_id == user_id,
+                UserSubscriptionORM.is_active,
+                UserSubscriptionORM.category == category,
+                UserSubscriptionORM.location == location,
+            )
         )
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()

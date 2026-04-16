@@ -1,16 +1,39 @@
-from datetime import datetime, timezone
 from aiogram.types import Message
 from loguru import logger
-from sqlalchemy import and_, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from jobscraper.bot.messages import are_args_valid
-from jobscraper.storage.models import UserORM, UserSubscriptionORM
+from jobscraper.storage.repository import UserSubscriptionRepository
 from jobscraper.storage.session import get_session_local
+from enum import Enum
+
+
+class SubscriptionResult(Enum):
+    CREATED = 1
+    EXISTS = 2
+    FAILED = 3
+
+
+def format_response(
+    subscription_result: SubscriptionResult, category: str, location: str
+):
+    if subscription_result == SubscriptionResult.CREATED:
+        return (
+            f"✅ Subscribed to `{category}` jobs in `{location}`!\n\n"
+            f"You'll receive notifications for new matching jobs.\n"
+            f"Use `/unsubscribe {category} {location}` to stop.\n\n"
+            "Use /mysubscriptions to view your current subscriptions"
+        )
+    elif subscription_result == SubscriptionResult.EXISTS:
+        return f"ℹ️ You're already subscribed to `{category}` jobs in `{location}`\n\n"
+    else:
+        return "❌ Failed to create subscription. Please try again later"
 
 
 async def subscribe_cmd(message: Message):
     """Handle /subscribe category location command."""
-    if not message.text:
+    if not message.text or not message.from_user:
         return
 
     args_ok, error_msg = are_args_valid(message.text)
@@ -20,67 +43,33 @@ async def subscribe_cmd(message: Message):
     _, category, location = message.text.split()
     category, location = category.upper(), location.upper()
 
-    # Save subscription
-    async with get_session_local()() as session:
-        # Check if user exists, create if not
-        if not message.from_user:
-            return
-        user = await session.get(UserORM, message.from_user.id)
-        if not user:
-            user = UserORM(
-                id=message.from_user.id,
-                chat_id=message.chat.id,
-                username=message.from_user.username,
-                created_at=datetime.now(timezone.utc),
-                last_interaction=datetime.now(timezone.utc),
+    subscription_res = SubscriptionResult.FAILED
+    try:
+        async with get_session_local()() as session:
+            subscription_res = await create_subscription_response(
+                session, message.from_user.id, category, location
             )
-            session.add(user)
             await session.commit()
+    except SQLAlchemyError as e:
+        logger.error(f"DB session error: {e}")
 
-        # Check if subscription already exists
-        existing = await session.execute(
-            select(UserSubscriptionORM).where(
-                and_(
-                    UserSubscriptionORM.user_id == message.from_user.id,
-                    UserSubscriptionORM.category == category,
-                    UserSubscriptionORM.location == location,
-                )
-            )
+    response_text = format_response(subscription_res, category, location)
+    await message.answer(response_text, parse_mode="markdown")
+
+
+async def create_subscription_response(
+    session: AsyncSession, user_id: int, category: str, location: str
+) -> SubscriptionResult:
+    subscription_repo = UserSubscriptionRepository(session)
+
+    try:
+        existing = await subscription_repo.find_subscription(
+            user_id, category, location
         )
-        if existing.scalar_one_or_none():
-            await message.answer(
-                f"ℹ️ You're already subscribed to `{category}` jobs in `{location}`.\n\n",
-                parse_mode="Markdown",
-            )
-            return
-
-        # Create new subscription
-        try:
-            subscription = UserSubscriptionORM(
-                user_id=message.from_user.id,
-                category=category,
-                location=location,
-                is_active=True,
-                created_at=datetime.now(timezone.utc),
-                last_notified_at=datetime.fromtimestamp(0, tz=timezone.utc),
-            )
-            session.add(subscription)
-            await session.commit()
-
-            await message.answer(
-                f"✅ Subscribed to `{category}` jobs in `{location}`!\n\n"
-                f"You'll receive notifications for new matching jobs.\n"
-                f"Use `/unsubscribe {category} {location}` to stop.\n\n"
-                "Use /mysubscriptions to view your current subscriptions",
-                parse_mode="markdown",
-            )
-            logger.info(
-                f"User {message.from_user.id} subscribed to {category}->{location}"
-            )
-
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Failed to create subscription: {e}")
-            await message.answer(
-                "❌ Failed to create subscription. Please try again later.",
-            )
+        if existing:
+            return SubscriptionResult.EXISTS
+        await subscription_repo.create_subscription(user_id, category, location)
+        return SubscriptionResult.CREATED
+    except SQLAlchemyError as e:
+        logger.error(f"DB error while creating subscription: {e}")
+        return SubscriptionResult.FAILED
