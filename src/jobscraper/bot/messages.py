@@ -4,33 +4,6 @@ from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
 from jobscraper.storage.models import NotificationORM, UserORM
 
 
-def get_job_notification_text(batch: list[NotificationORM]) -> str:
-    jobs_text = "\n\n---\n\n".join(
-        [
-            f"📌 *{n.job.title}*\n"
-            f"🏢 {n.job.company}\n"
-            f"📍 {n.job.location}\n"
-            f"🔗 [View]({n.job.url})"
-            for n in batch
-        ]
-    )
-
-    return f"🎉 *New job alert!*\n\n{jobs_text}\n\n"
-
-
-def get_categories_text(categories: list[str]):
-    if not categories:
-        return "*No categories available at the moment.*\n\nPlease check back later."
-    sorted_cats = sorted(categories)
-    categories_list = "\n".join([f"• `{cat}`" for cat in sorted_cats])
-    return (
-        "*Available Job Categories*\n\n"
-        f"{categories_list}\n\n"
-        "💡 *How to subscribe:*\n"
-        "Use `/subscribe <CATEGORY> <LOCATION>`\n"
-    )
-
-
 def are_args_valid(text: str) -> tuple[bool, str]:
     # Parse arguments
     args = text.split()
@@ -70,3 +43,17 @@ async def send_batch_notification(
         parse_mode="Markdown",
         disable_web_page_preview=True,
     )
+
+
+def get_job_notification_text(batch: list[NotificationORM]) -> str:
+    jobs_text = "\n\n---\n\n".join(
+        [
+            f"📌 *{n.job.title}*\n"
+            f"🏢 {n.job.company}\n"
+            f"📍 {n.job.location}\n"
+            f"🔗 [View]({n.job.url})"
+            for n in batch
+        ]
+    )
+
+    return f"🎉 *New job alert!*\n\n{jobs_text}\n\n"

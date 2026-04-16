@@ -179,11 +179,3 @@ class NotificationRepository:
 
     def mark_permanently_failed(self, notification: NotificationORM):
         notification.status = "failed"
-
-
-# class UserRepository:
-#     def __init__(self, session: AsyncSession):
-#         self.session = session
-#
-#     def
-#
