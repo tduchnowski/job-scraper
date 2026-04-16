@@ -7,7 +7,12 @@ from typing import Optional, Sequence, Tuple
 from sqlalchemy.orm.strategy_options import selectinload
 
 from jobscraper.models.job import Job, JobStatus
-from jobscraper.storage.models import JobORM, NotificationORM, UserSubscriptionORM
+from jobscraper.storage.models import (
+    JobORM,
+    NotificationORM,
+    UserORM,
+    UserSubscriptionORM,
+)
 from jobscraper.storage.mappers import job_to_orm
 
 
@@ -62,6 +67,27 @@ class JobRepository:
             update(JobORM).where(JobORM.id == job_id).values(status=status)
         )
         await self.session.commit()
+
+
+class UserRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def add_or_update(self, user_id: int, chat_id: int, username: str | None):
+        user = await self.session.get(UserORM, user_id)
+        if not user:
+            # Create new user
+            user = UserORM(
+                id=user_id,
+                chat_id=chat_id,
+                username=username,
+                created_at=datetime.now(timezone.utc),
+                last_interaction=datetime.now(timezone.utc),
+            )
+            self.session.add(user)
+        else:
+            # Update last interaction
+            user.last_interaction = datetime.now(timezone.utc)
 
 
 class UserSubscriptionRepository:

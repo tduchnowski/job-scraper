@@ -1,34 +1,25 @@
-from datetime import datetime, timezone
 from aiogram.types import Message
-from loguru import logger
-from jobscraper.bot.messages import get_start_text
-from jobscraper.storage.models import UserORM
-from jobscraper.storage.session import get_session_local
 
 
 async def start_cmd(message: Message):
-    # Save user to database
-    async with get_session_local()() as session:
-        # Check if user exists
-        if not message.from_user:
-            return
-        user = await session.get(UserORM, message.from_user.id)
-        if not user:
-            # Create new user
-            user = UserORM(
-                id=message.from_user.id,
-                chat_id=message.chat.id,
-                username=message.from_user.username,
-                created_at=datetime.now(timezone.utc),
-                last_interaction=datetime.now(timezone.utc),
-            )
-            session.add(user)
-            await session.commit()
-            logger.info(f"New user saved: {user.id} ({user.username})")
-        else:
-            # Update last interaction
-            user.last_interaction = datetime.now(timezone.utc)
-            await session.commit()
-            logger.debug(f"User updated: {user.id}")
-
-    await message.answer(get_start_text(), parse_mode="markdown")
+    response = (
+        "🎯 *Welcome to IT Jobs Worldwide Bot!*\n\n"
+        "I'll help you stay updated with the latest job opportunities matching your preferences.\n\n"
+        "📌 *Quick Start*\n\n"
+        "1️⃣  Subscribe to job catgories and locations\n"
+        "2️⃣  I'll notify you when new jobs are posted\n"
+        "3️⃣  Never miss an opportunity!\n\n"
+        "📋 *Available Commands*\n\n"
+        "`/subscribe <CATEGORY> <LOCATION>`\n"
+        "Add a subscription\n\n"
+        "`/unsubscribe <CATEGORY> <LOCATION>`\n"
+        "Remove a subscription\n\n"
+        "`/categories`\n"
+        "See all job categories\n\n"
+        "`/mysubscriptions`\n"
+        "View your current subscriptions\n\n"
+        "`/help`\n"
+        "Show all commands\n\n\n"
+        "🚀 Ready to find your next job?"
+    )
+    await message.answer(response, parse_mode="markdown")

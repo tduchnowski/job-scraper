@@ -2,6 +2,8 @@ import os
 from aiogram import Bot, Dispatcher
 from typing import Tuple
 
+from jobscraper.bot.middleware import UserTrackingMiddleware
+
 
 def init_bot_and_dispatcher() -> Tuple[Bot, Dispatcher]:
     """Initialize bot and dispatcher together."""
@@ -14,5 +16,6 @@ def init_bot_and_dispatcher() -> Tuple[Bot, Dispatcher]:
     bot = Bot(token=token)
     dp = Dispatcher()
     register_handlers(dp)
+    dp.message.middleware(UserTrackingMiddleware())
 
     return bot, dp
