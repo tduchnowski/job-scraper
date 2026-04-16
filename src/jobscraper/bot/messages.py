@@ -5,9 +5,6 @@ from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
 from jobscraper.storage.models import NotificationORM, UserORM, UserSubscriptionORM
 
 
-GENERAL_FAIL_MSG = "Something went wrong. Try again later"
-
-
 def get_job_notification_text(batch: list[NotificationORM]) -> str:
     jobs_text = "\n\n---\n\n".join(
         [
@@ -20,26 +17,6 @@ def get_job_notification_text(batch: list[NotificationORM]) -> str:
     )
 
     return f"🎉 *New job alert!*\n\n{jobs_text}\n\n"
-
-
-def get_help_text() -> str:
-    return (
-        "🤖 *IT Jobs Worldwide Bot– Help*\n\n"
-        "Here’s how you can use the bot:\n\n"
-        "*/subscribe <category> <location>*\n"
-        "Subscribe to job notifications for a given category and location.\n"
-        "Example:\n"
-        "`/subscribe GO GERMANY`\n\n"
-        "*/unsubscribe <category> <location>*\n"
-        "Stop receiving notifications for a specific subscription.\n"
-        "Example:\n"
-        "`/unsubscribe GO GERMANY`\n\n"
-        "*/categories*\n"
-        "View the list of all supported job categories you can subscribe to.\n\n"
-        "*/mysubscriptions*\n"
-        "See all your current subscriptions.\n\n"
-        "You’ll receive notifications whenever new jobs matching your subscriptions are found 🚀"
-    )
 
 
 def get_categories_text(categories: list[str]):
