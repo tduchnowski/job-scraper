@@ -1,8 +1,7 @@
-from typing import Sequence
 from aiogram import Bot
 
 from jobscraper.config.scraping_config import LOCATIONS, SEARCH_QUERIES
-from jobscraper.storage.models import NotificationORM, UserORM, UserSubscriptionORM
+from jobscraper.storage.models import NotificationORM, UserORM
 
 
 def get_job_notification_text(batch: list[NotificationORM]) -> str:
@@ -29,29 +28,6 @@ def get_categories_text(categories: list[str]):
         f"{categories_list}\n\n"
         "💡 *How to subscribe:*\n"
         "Use `/subscribe <CATEGORY> <LOCATION>`\n"
-    )
-
-
-def get_subscriptions_text(subscriptions: Sequence[UserSubscriptionORM]) -> str:
-    if not subscriptions:
-        return (
-            "📋 *You have no active subscriptions*\n\n"
-            "💡 *Get started:*\n"
-            "Use `/subscribe <CATEGORY> <LOCATION>` to start receiving job notifications\n\n"
-            "Use `/categories` to see all available categories"
-        )
-
-    sorted_subs = sorted(subscriptions, key=lambda s: (s.category, s.location))
-    subscription_lines = []
-    for i, sub in enumerate(sorted_subs, 1):
-        subscription_lines.append(f"{i}. {sub.category.value} → {sub.location}")
-
-    subscriptions_list = "\n".join(subscription_lines)
-    return (
-        "📋 *Your Active Subscriptions*\n\n"
-        f"{subscriptions_list}\n\n"
-        "❌ *Remove a subscription:*\n"
-        "Use `/unsubscribe <CATEGORY> <LOCATION>`\n\n"
     )
 
 
