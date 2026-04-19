@@ -2,21 +2,15 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.exc import SQLAlchemyError
 
-from jobscraper.bot.handlers.subscribe import (
-    SubscriptionResult,
-    SubscribeService,
-    subscribe_cmd,
-)
-
-
-# --- SubscriptionService.create_subscription tests
+from jobscraper.bot.handlers.subscribe import subscribe_cmd
+from jobscraper.bot.subscription_service import SubscriptionResult, SubscriptionService
 
 
 @pytest.mark.asyncio
 async def test_subscription_exists():
     repo = AsyncMock()
     repo.find_subscription.return_value = object()
-    subs_service = SubscribeService(None)
+    subs_service = SubscriptionService(None)
     res = await subs_service.create_subscription(
         repo, user_id=1, category="X", location="P"
     )
@@ -29,7 +23,7 @@ async def test_subscription_absent():
     repo = AsyncMock()
     repo.find_subscription.return_value = None
     repo.create_subscription.return_value = None
-    subs_service = SubscribeService(None)
+    subs_service = SubscriptionService(None)
     res = await subs_service.create_subscription(
         repo, user_id=1, category="X", location="P"
     )
@@ -41,7 +35,7 @@ async def test_subscription_absent():
 async def test_subscription_find_subscription_db_error():
     repo = AsyncMock()
     repo.find_subscription.side_effect = SQLAlchemyError()
-    subs_service = SubscribeService(None)
+    subs_service = SubscriptionService(None)
     res = await subs_service.create_subscription(
         repo, user_id=1, category="X", location="P"
     )
@@ -53,7 +47,7 @@ async def test_subscription_create_subscription_db_error():
     repo = AsyncMock()
     repo.find_subscription.return_value = None
     repo.create_subscription.side_effect = SQLAlchemyError()
-    subs_service = SubscribeService(None)
+    subs_service = SubscriptionService(None)
     res = await subs_service.create_subscription(
         repo, user_id=1, category="X", location="P"
     )
