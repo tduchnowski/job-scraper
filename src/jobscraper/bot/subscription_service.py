@@ -78,5 +78,5 @@ class SubscriptionService:
                     RemoveSubscriptionResult.REMOVED
                 )  # technically its more like marking as inactive than removing...
         except SQLAlchemyError as e:
-            logger.error(f"DB error while creating subscription: {e}")
+            logger.error(f"DB error while deleting subscription: {e}")
             return RemoveSubscriptionResult.FAILED
