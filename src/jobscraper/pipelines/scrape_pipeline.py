@@ -137,10 +137,7 @@ async def scrape_one(
 
 
 async def get_scraping_scope(session: AsyncSession) -> dict[str, list[str]]:
-    """
-    Determinates unique combinations of locations and categories and groups them
-    into a dict where each location is assigned a list of categories
-    """
+    """Get active (location, category) pairs grouped by location."""
     scope = defaultdict(list)
     stmt = (
         select(UserSubscriptionORM.location, UserSubscriptionORM.category)

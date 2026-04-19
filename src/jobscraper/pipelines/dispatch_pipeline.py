@@ -198,6 +198,7 @@ def select_notifications_to_send(
     notifications_per_message=10,
     all_notifications_limit=2000,
 ) -> dict[int, list[NotificationORM]]:
+    """Round-robin distribution of notifications across users, capped by limits."""
     # my version of round robin. user_notifications are already random to begin with
 
     to_send: dict[int, list[NotificationORM]] = defaultdict(list)
