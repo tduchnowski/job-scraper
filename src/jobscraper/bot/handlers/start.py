@@ -1,6 +1,7 @@
 from aiogram.types import Message
 
 
+"""Welcome message for /start command."""
 RESPONSE = (
     "🎯 *Welcome to IT Jobs Worldwide Bot!*\n\n"
     "I'll help you stay updated with the latest job opportunities matching your preferences.\n\n"

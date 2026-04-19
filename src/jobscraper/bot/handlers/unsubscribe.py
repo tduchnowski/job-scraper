@@ -10,6 +10,7 @@ from jobscraper.bot.subscription_service import (
 
 
 async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
+    """Handle /unsubscribe command."""
     if not message.text or not message.from_user:
         return
 
@@ -35,27 +36,10 @@ async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
 def format_response(
     remove_subscription_result: RemoveSubscriptionResult, category: str, location: str
 ) -> str:
+    """Format removal result into user-facing markdown message."""
     if remove_subscription_result == RemoveSubscriptionResult.REMOVED:
         return f"✅ You won't receive notifications for {category} -> {location}"
     elif remove_subscription_result == RemoveSubscriptionResult.NOT_EXIST:
         return f"✅ You're already not subscribed to {category} -> {location}"
     else:
         return "❌ Failed to remove subscription. Please try again later"
-
-
-# async def delete_subscription(
-#     session: AsyncSession, user_id: int, category: str, location: str
-# ) -> RemoveSubscriptionResult:
-#     repo = UserSubscriptionRepository(session)
-#     try:
-#         sub = await repo.find_subscription(user_id, category, location)
-#         if not sub:
-#             return RemoveSubscriptionResult.NOT_EXIST
-#         else:
-#             sub.is_active = False
-#             return (
-#                 RemoveSubscriptionResult.REMOVED
-#             )  # technically its more like marking as inactive than removing...
-#     except SQLAlchemyError as e:
-#         logger.error(f"DB error while creating subscription: {e}")
-#         return RemoveSubscriptionResult.FAILED

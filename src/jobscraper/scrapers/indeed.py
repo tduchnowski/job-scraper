@@ -89,16 +89,3 @@ class IndeedScraper:
                 )
             )
         return result
-
-    # async def scrape_job_details(self, job_url: str) -> Dict[str, str]:
-    #     if self._session is None:
-    #         logger.warning("Session is None, so can't fetch job details")
-    #         return {}
-    #     async with self._session.get(job_url, headers=self._HEADERS) as response:
-    #         return self._parse_job_details(await response.text())
-    #
-    # def _parse_job_details(self, html: str) -> Dict[str, str]:
-    #     return {"description": "test description", "location": "Warszawa"}
-    #
-    # def _parse_description(self, html) -> str:
-    #     return ""

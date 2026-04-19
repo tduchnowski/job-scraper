@@ -7,16 +7,12 @@ from jobscraper.storage.repository import UserSubscriptionRepository
 
 
 class SubscriptionResult(Enum):
-    """Subscription creation result: CREATED, EXISTS, or FAILED."""
-
     CREATED = 1
     EXISTS = 2
     FAILED = 3
 
 
 class RemoveSubscriptionResult(Enum):
-    """Subscription removal result: REMOVED, NOT_EXIST, or FAILED."""
-
     REMOVED = 1
     NOT_EXIST = 2
     FAILED = 3

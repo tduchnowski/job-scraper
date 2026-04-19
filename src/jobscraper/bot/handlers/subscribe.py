@@ -7,7 +7,6 @@ from jobscraper.bot.subscription_service import SubscriptionResult, Subscription
 
 
 async def subscribe_cmd(message: Message, subs_service: SubscriptionService):
-    """Handle /subscribe category location command."""
     if not message.text or not message.from_user:
         return
 
@@ -33,6 +32,7 @@ async def subscribe_cmd(message: Message, subs_service: SubscriptionService):
 def format_response(
     subscription_result: SubscriptionResult, category: str, location: str
 ):
+    """Format subscription result into user-facing markdown message."""
     if subscription_result == SubscriptionResult.CREATED:
         return (
             f"✅ Subscribed to `{category}` jobs in `{location}`!\n\n"

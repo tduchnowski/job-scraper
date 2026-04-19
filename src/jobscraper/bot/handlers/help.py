@@ -1,6 +1,7 @@
 from aiogram.types import Message
 
 
+"""Help text for /help command."""
 RESPONSE = (
     "🤖 *IT Jobs Worldwide Bot– Help*\n\n"
     "Here’s how you can use the bot:\n\n"

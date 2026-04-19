@@ -10,6 +10,7 @@ async def categories_cmd(message: Message):
 
 
 def get_categories_text(categories: list[str]):
+    """Generate markdown list of categories with subscription instructions."""
     if not categories:
         return "*No categories available at the moment.*\n\nPlease check back later."
     sorted_cats = sorted(categories)

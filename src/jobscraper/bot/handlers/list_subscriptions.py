@@ -28,6 +28,7 @@ async def mysubscriptions_cmd(message: Message):
 
 
 def format_subscriptions_list(subscriptions: Sequence[UserSubscriptionORM]) -> str:
+    """Convert subscriptions to markdown list with usage instructions."""
     if not subscriptions:
         return (
             "📋 *You have no active subscriptions*\n\n"
