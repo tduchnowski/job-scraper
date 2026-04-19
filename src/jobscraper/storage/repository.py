@@ -22,10 +22,13 @@ class UpsertResult(Enum):
 
 
 class JobRepository:
+    """Repository for Job CRUD operations."""
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def upsert(self, job: Job) -> Tuple[JobORM, UpsertResult]:
+        """Insert job if not exists, otherwise update. Returns ORM object and result."""
         existing = await self.session.get(JobORM, job.id)
 
         if existing:
@@ -42,18 +45,18 @@ class JobRepository:
         return orm_obj, result
 
     async def upsert_batch(self, jobs: list[Job]) -> int:
-        """
-        Upsert batch of jobs and return if the operation was successful
-        """
+        """Upsert batch of jobs. Returns count of jobs processed."""
         jobs_orm = [job_to_orm(job) for job in jobs]
         for job_orm in jobs_orm:
             await self.session.merge(job_orm)
         return len(jobs_orm)
 
     async def get(self, job_id: str) -> Optional[JobORM]:
+        """Get job by ID."""
         return await self.session.get(JobORM, job_id)
 
     async def get_new_jobs(self) -> Sequence[JobORM]:
+        """Get all jobs with NEW status, ordered by creation date."""
         query = (
             select(JobORM)
             .where(JobORM.status == JobStatus.NEW)
@@ -63,6 +66,7 @@ class JobRepository:
         return res.scalars().all()
 
     async def update_status(self, job_id: str, status: str):
+        """Update job status."""
         await self.session.execute(
             update(JobORM).where(JobORM.id == job_id).values(status=status)
         )
@@ -70,13 +74,15 @@ class JobRepository:
 
 
 class UserRepository:
+    """Repository for User CRUD operations."""
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def add_or_update(self, user_id: int, chat_id: int, username: str | None):
+        """Create new user or update last_interaction for existing."""
         user = await self.session.get(UserORM, user_id)
         if not user:
-            # Create new user
             user = UserORM(
                 id=user_id,
                 chat_id=chat_id,
@@ -86,17 +92,19 @@ class UserRepository:
             )
             self.session.add(user)
         else:
-            # Update last interaction
             user.last_interaction = datetime.now(timezone.utc)
 
 
 class UserSubscriptionRepository:
+    """Repository for UserSubscription CRUD operations."""
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def get_user_subscriptions(
         self, user_id: int
     ) -> Sequence[UserSubscriptionORM]:
+        """Get all active subscriptions for a user."""
         stmt = select(UserSubscriptionORM).where(
             and_(UserSubscriptionORM.user_id == user_id),
             UserSubscriptionORM.is_active,
@@ -105,6 +113,7 @@ class UserSubscriptionRepository:
         return res.scalars().all()
 
     async def create_subscription(self, user_id: int, category: str, location: str):
+        """Create a new subscription for user."""
         subscription = UserSubscriptionORM(
             user_id=user_id,
             category=category,
@@ -118,6 +127,7 @@ class UserSubscriptionRepository:
     async def find_subscription(
         self, user_id: int, category: str, location: str
     ) -> UserSubscriptionORM | None:
+        """Find active subscription by user/category/location."""
         stmt = select(UserSubscriptionORM).where(
             and_(
                 UserSubscriptionORM.user_id == user_id,
@@ -131,10 +141,13 @@ class UserSubscriptionRepository:
 
 
 class NotificationRepository:
+    """Repository for Notification CRUD operations."""
+
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def get_all_pending(self, limit=2000) -> Sequence[NotificationORM]:
+        """Get pending notifications due for delivery, randomly ordered."""
         stmt = (
             select(NotificationORM)
             .where(
@@ -154,12 +167,14 @@ class NotificationRepository:
         return result.scalars().all()
 
     async def mark_successful(self, notification: NotificationORM):
+        """Mark notification as sent."""
         notification.status = "sent"
         notification.last_attempt_at = datetime.now(timezone.utc)
 
     def mark_failed(
         self, notification: NotificationORM, retry_delay: float | None = None
     ):
+        """Mark notification as failed. Schedules retry with exponential backoff (2/4/8 min)."""
         notification.attempts += 1
         notification.last_attempt_at = datetime.now(timezone.utc)
 
@@ -168,14 +183,14 @@ class NotificationRepository:
         else:
             delay = retry_delay
             if retry_delay is None:
-                delay = 60 * (2**notification.attempts)  # 2, 4, 8 minutes
+                delay = 60 * (2**notification.attempts)
             else:
                 delay = retry_delay
 
-            # Retry in exponential backoff: 5min, 30min, 2h
             notification.next_attempt_at = datetime.now(timezone.utc) + timedelta(
                 seconds=delay
             )
 
     def mark_permanently_failed(self, notification: NotificationORM):
+        """Mark notification as permanently failed after max retries."""
         notification.status = "failed"
