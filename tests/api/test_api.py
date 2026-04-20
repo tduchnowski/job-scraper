@@ -22,6 +22,7 @@ def app_setup():
 
 def test_webhook_success(app_setup):
     client, app = app_setup
+    app.state.webhook_token = "123"
     response = client.post(
         "/webhook",
         json={
@@ -32,6 +33,7 @@ def test_webhook_success(app_setup):
                 "chat": {"id": 1, "type": "private"},
             },
         },
+        headers={"X-Telegram-Bot-Api-Secret-Token": "123"},
     )
 
     assert response.status_code == 200
@@ -40,20 +42,49 @@ def test_webhook_success(app_setup):
 
 def test_webhook_dispatch_error(app_setup):
     client, app = app_setup
+    app.state.webhook_token = "123"
     app.state.dp.feed_update.side_effect = Exception()
 
-    response = client.post("/webhook", json={"update_id": 1})
+    response = client.post(
+        "/webhook",
+        json={"update_id": 1},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "123"},
+    )
 
     assert response.status_code == 200
     app.state.dp.feed_update.assert_awaited_once()
 
 
 def test_webhook_invalid_json(app_setup):
-    client, _ = app_setup
+    client, app = app_setup
+    app.state.webhook_token = "123"
 
-    response = client.post("/webhook", data="not json")
+    response = client.post(
+        "/webhook", data="not json", headers={"X-Telegram-Bot-Api-Secret-Token": "123"}
+    )
 
     assert response.status_code == 200
+
+
+def test_webhook_unauthorized(app_setup):
+    client, app = app_setup
+    app.state.webhook_token = "123"
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "abc"}
+    response = client.post(
+        "/webhook",
+        json={
+            "update_id": 1,
+            "message": {
+                "message_id": 1,
+                "date": 0,
+                "chat": {"id": 1, "type": "private"},
+            },
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 401
+    app.state.dp.feed_update.assert_not_awaited()
 
 
 # --- /scrape tests

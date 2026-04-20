@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, Response
+import os
+from fastapi import FastAPI, HTTPException, Request, Response
 from contextlib import asynccontextmanager
 from aiogram import types
 from fastapi.responses import JSONResponse
@@ -20,12 +21,15 @@ def create_app(bot=None, dp=None):
             setup_env()
             set_session_local()
             app.state.bot, app.state.dp = init_bot_and_dispatcher()
+            app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
         yield
 
     app = FastAPI(lifespan=lifespan)
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        if isinstance(exc, HTTPException):
+            raise exc
         logger.exception(f"Unhandled error: {exc}")
 
         return JSONResponse(
@@ -36,6 +40,10 @@ def create_app(bot=None, dp=None):
     @app.post("/webhook")
     async def webhook(request: Request):
         """Handle Telegram webhook updates."""
+        secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if secret != app.state.webhook_token:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
         try:
             # parse update
             update_data = await request.json()
@@ -47,7 +55,7 @@ def create_app(bot=None, dp=None):
         except Exception as e:
             logger.exception(f"Webhook error: {e}")
 
-        return Response(status_code=200)  # always return 200
+        return Response(status_code=200)  # always return 200, unless unauthorized
 
     @app.post("/scrape")
     async def scrape_jobs():
