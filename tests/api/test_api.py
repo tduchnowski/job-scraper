@@ -91,14 +91,15 @@ def test_webhook_unauthorized(app_setup):
 
 
 def test_scrape_no_error(app_setup):
-    client, _ = app_setup
+    client, app = app_setup
+    app.state.api_key = "123"
     scrape_result = ScrapeResult()
     scrape_result.ok = True
     scrape_result.new_jobs_processed = 2
     with patch(
         "jobscraper.api.api.scrape_and_create_notifications", return_value=scrape_result
     ) as scrape_and_create:
-        resp = client.post("/scrape")
+        resp = client.post("/scrape", headers={"X-API-Key": "123"})
         data = resp.json()
         assert resp.status_code == 200
         scrape_and_create.assert_awaited_once()
@@ -107,21 +108,36 @@ def test_scrape_no_error(app_setup):
 
 
 def test_scrape_error(app_setup):
-    client, _ = app_setup
+    client, app = app_setup
+    app.state.api_key = "123"
 
     with patch(
         "jobscraper.api.api.scrape_and_create_notifications", side_effect=Exception()
     ):
-        resp = client.post("/scrape")
+        resp = client.post("/scrape", headers={"X-API-Key": "123"})
 
         assert resp.status_code == 500
+
+
+def test_scrape_unauthorized(app_setup):
+    client, app = app_setup
+    app.state.api_key = "123"
+
+    with patch(
+        "jobscraper.api.api.scrape_and_create_notifications", side_effect=Exception()
+    ) as create_notifications_mock:
+        resp = client.post("/scrape", headers={"X-API-Key": "abc"})
+
+        assert resp.status_code == 401
+        create_notifications_mock.assert_not_awaited()
 
 
 # --- /dispatch tests
 
 
 def test_dispatch_no_error(app_setup):
-    client, _ = app_setup
+    client, app = app_setup
+    app.state.api_key = "123"
     result = DispatchResult()
     result.ok = True
     result.notifications_failed = 2
@@ -130,7 +146,7 @@ def test_dispatch_no_error(app_setup):
     with patch(
         "jobscraper.api.api.dispatch_notifications", return_value=result
     ) as notifications:
-        resp = client.post("/dispatch")
+        resp = client.post("/dispatch", headers={"X-API-Key": "123"})
         data = resp.json()
         assert resp.status_code == 200
         notifications.assert_awaited_once()
@@ -140,9 +156,23 @@ def test_dispatch_no_error(app_setup):
 
 
 def test_dispatch_error(app_setup):
-    client, _ = app_setup
+    client, app = app_setup
+    app.state.api_key = "123"
 
     with patch("jobscraper.api.api.dispatch_notifications", side_effect=Exception()):
-        resp = client.post("/dispatch")
+        resp = client.post("/dispatch", headers={"X-API-Key": "123"})
 
         assert resp.status_code == 500
+
+
+def test_dispatch_unauthorized(app_setup):
+    client, app = app_setup
+    app.state.api_key = "123"
+
+    with patch(
+        "jobscraper.api.api.dispatch_notifications", side_effect=Exception()
+    ) as dispatch_notifications_mock:
+        resp = client.post("/dispatch", headers={"X-API-Key": "abc"})
+
+        assert resp.status_code == 401
+        dispatch_notifications_mock.assert_not_awaited()

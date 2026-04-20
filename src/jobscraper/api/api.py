@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from contextlib import asynccontextmanager
 from aiogram import types
 from fastapi.responses import JSONResponse
@@ -22,6 +22,7 @@ def create_app(bot=None, dp=None):
             set_session_local()
             app.state.bot, app.state.dp = init_bot_and_dispatcher()
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
+            app.state.api_key = os.getenv("API_KEY")
         yield
 
     app = FastAPI(lifespan=lifespan)
@@ -30,6 +31,7 @@ def create_app(bot=None, dp=None):
     async def global_exception_handler(request: Request, exc: Exception):
         if isinstance(exc, HTTPException):
             raise exc
+
         logger.exception(f"Unhandled error: {exc}")
 
         return JSONResponse(
@@ -57,8 +59,14 @@ def create_app(bot=None, dp=None):
 
         return Response(status_code=200)  # always return 200, unless unauthorized
 
+    async def verify_api_key(request: Request):
+        api_key = request.headers.get("X-API-Key")
+        if api_key != app.state.api_key:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return True
+
     @app.post("/scrape")
-    async def scrape_jobs():
+    async def scrape_jobs(api_key_valid: bool = Depends(verify_api_key)):
         """
         Triggers scraping of job boards and updating DB with new jobs and notifications
         This endpoint is intended for scheduler use only. Not publicly available.
@@ -71,7 +79,7 @@ def create_app(bot=None, dp=None):
         return res
 
     @app.post("/dispatch")
-    async def dispatch_jobs():
+    async def dispatch_jobs(api_key_valid: bool = Depends(verify_api_key)):
         """
         Triggers sending new jobs to users
         """
@@ -83,7 +91,7 @@ def create_app(bot=None, dp=None):
         return res
 
     @app.post("/clean")
-    async def clean_db():
+    async def clean_db(api_key_valid: bool = Depends(verify_api_key)):
         """
         Cleans the database of all processed jobs and sent notifications
         """
