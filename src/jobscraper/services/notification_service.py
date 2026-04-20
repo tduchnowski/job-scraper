@@ -2,7 +2,6 @@ from typing import Sequence
 from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from jobscraper.storage.models import (
     JobORM,
     NotificationORM,
@@ -15,8 +14,8 @@ class NotificationService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_for_job(self, job: JobORM):
-        """Create notifications for all users matching a job. Returns count"""
+    async def create_for_job(self, job: JobORM) -> int:
+        """Create notifications for all users matching a job and insert it in a session. Return the number of notifications found"""
         query = (
             select(UserORM.id, UserSubscriptionORM.id)
             .join(UserSubscriptionORM, UserSubscriptionORM.user_id == UserORM.id)
@@ -44,8 +43,9 @@ class NotificationService:
             .on_conflict_do_nothing()
         )
         await self.session.execute(stmt)
+        return len(user_and_subscription_ids)
 
     async def create_for_new_jobs(self, jobs: Sequence[JobORM]):
-        """Create notifications for all NEW jobs. Returns total notifications created."""
+        """Create notifications for all NEW jobs"""
         for job in jobs:
             await self.create_for_job(job)
