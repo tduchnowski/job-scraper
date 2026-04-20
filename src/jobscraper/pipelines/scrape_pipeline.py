@@ -28,10 +28,11 @@ class ScrapeResult:
     error: Optional[str] = None
 
 
-async def scrape_and_create_notifications():
+async def scrape_and_create_notifications() -> ScrapeResult:
     result = ScrapeResult()
     try:
-        async with get_session_local()() as session:
+        session_factory = get_session_local()
+        async with session_factory() as session:
             try:
                 # get new jobs
                 start_t = time.perf_counter()
@@ -69,10 +70,6 @@ async def scrape_and_create_notifications():
                 logger.error(f"Network error during scraping: {e}")
                 await session.rollback()
                 result.error = f"Network error: {str(e)}"
-            except Exception as e:
-                logger.exception(f"Scraping pipeline failed: {e}")
-                await session.rollback()
-                result.error = str(e)
     except SQLAlchemyError as e:
         result.error = f"Session creation failed: {str(e)}"
     return result
