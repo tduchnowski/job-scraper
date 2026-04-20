@@ -1,5 +1,4 @@
 import os
-from loguru import logger
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 _session_local = None
@@ -29,7 +28,6 @@ def set_session_local():
         class_=AsyncSession,
         expire_on_commit=False,
     )
-    logger.info(f"Engine set up for DB_URL={db_url}")
 
 
 def get_db_url():
