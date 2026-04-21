@@ -1,3 +1,5 @@
+import asyncio
+from datetime import datetime
 import os
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from contextlib import asynccontextmanager
@@ -8,7 +10,10 @@ from jobscraper.bot import init_bot_and_dispatcher
 from jobscraper.config.env import setup_env
 from jobscraper.pipelines.dispatch_pipeline import dispatch_notifications
 from jobscraper.pipelines.scrape_pipeline import scrape_and_create_notifications
-from jobscraper.storage.session import set_session_local
+from jobscraper.storage.session import (
+    check_db_health,
+    set_session_local,
+)
 from jobscraper.utils.logger import setup_logger
 from loguru import logger
 
@@ -38,6 +43,34 @@ def create_app(bot=None, dp=None):
             status_code=500,
             content={"detail": "Internal Server Error"},
         )
+
+    @app.get("/health")
+    async def health():
+        """Health check endpoint for Cloud Run container health checks."""
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "checks": {},
+        }
+
+        # Check 1: Database connectivity
+        try:
+            await asyncio.wait_for(check_db_health(), timeout=5.0)
+            health_status["checks"]["database"] = "healthy"
+        except asyncio.TimeoutError:
+            logger.error("Database health check timed out after 5 seconds")
+            health_status["status"] = "unhealthy"
+            health_status["checks"]["database"] = "timeout"
+            health_status["error"] = "Database timeout"
+            return JSONResponse(status_code=503, content=health_status)
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            health_status["status"] = "unhealthy"
+            health_status["checks"]["database"] = "unhealthy"
+            health_status["error"] = str(e)
+            return JSONResponse(status_code=503, content=health_status)
+
+        return health_status
 
     @app.post("/webhook")
     async def webhook(request: Request):

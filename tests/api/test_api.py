@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
@@ -176,3 +177,50 @@ def test_dispatch_unauthorized(app_setup):
 
         assert resp.status_code == 401
         dispatch_notifications_mock.assert_not_awaited()
+
+
+# --- /health tests
+
+
+def test_health_returns_healthy_status(app_setup):
+    client, _ = app_setup
+    with patch("jobscraper.api.api.check_db_health", new_callable=AsyncMock):
+        response = client.get("/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "timestamp" in data
+        assert data["checks"]["database"] == "healthy"
+
+
+def test_health_returns_unhealthy_when_db_check_fails(app_setup):
+    client, _ = app_setup
+    with patch(
+        "jobscraper.api.api.check_db_health",
+        new_callable=AsyncMock,
+        side_effect=Exception("db error"),
+    ):
+        response = client.get("/health")
+
+        assert response.status_code == 503
+        data = response.json()
+        assert data["status"] == "unhealthy"
+        assert data["checks"]["database"] == "unhealthy"
+        assert data["error"] == "db error"
+
+
+def test_health_returns_unhealthy_when_db_check_times_out(app_setup):
+    client, _ = app_setup
+    with patch(
+        "jobscraper.api.api.check_db_health",
+        new_callable=AsyncMock,
+        side_effect=asyncio.TimeoutError,
+    ):
+        response = client.get("/health")
+
+        assert response.status_code == 503
+        data = response.json()
+        assert data["status"] == "unhealthy"
+        assert data["checks"]["database"] == "timeout"
+        assert data["error"] == "Database timeout"
