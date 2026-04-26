@@ -46,7 +46,6 @@ def create_app(bot=None, dp=None):
 
     @app.get("/health")
     async def health():
-        """Health check endpoint for Cloud Run container health checks."""
         health_status = {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
