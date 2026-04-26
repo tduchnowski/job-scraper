@@ -45,6 +45,8 @@ async def scrape_domain(
     semaphore: asyncio.Semaphore,
     location: str,
     categories: list[str],
+    wait_min: float = 1.0,
+    wait_max: float = 5.0,
 ) -> list[Job]:
     domain_jobs: list[Job] = []
     indeed = IndeedScraper(session, semaphore, location=location)
@@ -53,7 +55,7 @@ async def scrape_domain(
             try:
                 jobs = await scrape_one(indeed, location, category, query)
                 domain_jobs.extend(jobs)
-                await asyncio.sleep(random.uniform(1.0, 5.0))
+                await asyncio.sleep(random.uniform(wait_min, wait_max))
             except Exception as e:
                 logger.error(str(e))
     return domain_jobs
