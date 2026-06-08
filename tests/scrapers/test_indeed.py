@@ -17,7 +17,7 @@ def test_parse_job_list_basic(scraper_poland):
     <html>
         <body>
             <div class="job_seen_beacon">
-                <h2 class="jobTitle">Python Developer</h2>
+                <h3 class="jobTitle">Python Developer</h3>
                 <a data-jk="abc123" href="/rc/clk?jk=abc123"></a>
                 <span data-testid="company-name">Acme Corp</span>
             </div>
@@ -37,9 +37,9 @@ def test_title_nested_in_span(scraper_poland):
     html = """
     <div class="job_seen_beacon">
         <a data-jk="abc123" href="/rc/clk?jk=abc123">
-            <h2 class="jobTitle">
+            <h3 class="jobTitle">
                 <span>Python Developer</span>
-            </h2>
+            </h3>
         </a>
         <span data-testid="company-name">Acme</span>
     </div>
@@ -53,10 +53,10 @@ def test_title_with_noise(scraper_poland):
     html = """
     <div class="job_seen_beacon">
         <a data-jk="abc123" href="/rc/clk?jk=abc123">
-            <h2 class="jobTitle">
+            <h3 class="jobTitle">
                 <span>Python Developer</span>
                 <span class="new">new</span>
-            </h2>
+            </h3>
         </a>
         <span data-testid="company-name">Acme</span>
     </div>
@@ -81,7 +81,7 @@ def test_parse_skips_missing_jk(scraper_poland):
     html = """
     <div class="job_seen_beacon">
         <a href="/rc/clk"></a>
-        <h2 class="jobTitle">Python Dev</h2>
+        <h3 class="jobTitle">Python Dev</h3>
         <span data-testid="company-name">Acme</span>
     </div>
     """
@@ -92,12 +92,12 @@ def test_parse_skips_missing_jk(scraper_poland):
 def test_parse_multiple_jobs(scraper_poland):
     html = """
     <div class="job_seen_beacon">
-        <h2 class="jobTitle">Python Dev</h2>
+        <h3 class="jobTitle">Python Dev</h3>
         <a data-jk="1" href="/rc/clk?jk=1"></a>
         <span data-testid="company-name">Acme Corp</span>
     </div>
     <div class="job_seen_beacon">
-        <h2 class="jobTitle">Python Developer</h2>
+        <h3 class="jobTitle">Python Developer</h3>
         <a data-jk="2" href="/rc/clk?jk=2"></a>
         <span data-testid="company-name">Acme Corp</span>
     </div>
@@ -111,7 +111,7 @@ def test_jk_extraction(scraper_poland):
     html = """
     <div class="job_seen_beacon">
         <a data-jk="xyz789" href="/rc/clk?jk=xyz789"></a>
-        <h2 class="jobTitle">Dev</h2>
+        <h3 class="jobTitle">Dev</h3>
         <span data-testid="company-name">A</span>
     </div>
     """
@@ -122,15 +122,15 @@ def test_jk_extraction(scraper_poland):
 def test_duplicate_jobs(scraper_poland):
     html = """
     <div class="job_seen_beacon">
-        <a data-jk="same" href="/rc/clk?jk=same"><h2 class="jobTitle">Dev</h2></a>
+        <a data-jk="same" href="/rc/clk?jk=same"><h3 class="jobTitle">Dev</h3></a>
         <span data-testid="company-name">A</span>
     </div>
     <div class="job_seen_beacon">
-        <a data-jk="same" href="/rc/clk?jk=same"><h2 class="jobTitle">Dev</h2></a>
+        <a data-jk="same" href="/rc/clk?jk=same"><h3 class="jobTitle">Dev</h3></a>
         <span data-testid="company-name">A</span>
     </div>
     <div class="job_seen_beacon">
-        <a data-jk="diff" href="/rc/clk?jk=diff"><h2 class="jobTitle">Dev</h2></a>
+        <a data-jk="diff" href="/rc/clk?jk=diff"><h3 class="jobTitle">Dev</h3></a>
         <span data-testid="company-name">A</span>
     </div>
     """
