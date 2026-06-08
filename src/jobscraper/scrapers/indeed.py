@@ -58,7 +58,7 @@ class IndeedScraper:
         job_ids = set()
 
         for job in jobs:
-            title = job.find("h2", {"class": "jobTitle"})
+            title = job.find("h3", {"class": "jobTitle"})
             title = title.get_text(strip=True) if title else None
             company = job.find("span", {"data-testid": "company-name"})
             company = company.get_text(strip=True) if company else None
