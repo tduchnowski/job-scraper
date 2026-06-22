@@ -120,6 +120,7 @@ def create_app(bot=None, dp=None):
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "checks": {},
+            # TODO: add redis connection check
         }
 
         return health_status
