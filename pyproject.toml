@@ -23,6 +23,7 @@ dependencies = [
     "asyncpg (>=0.31.0,<0.32.0)",
     "psycopg2-binary (>=2.9.11,<3.0.0)",
     "gunicorn (>=25.3.0,<26.0.0)",
+    "redisaq (>=0.1.4,<0.2.0)",
 ]
 
 

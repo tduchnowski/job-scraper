@@ -1,9 +1,10 @@
 import os
 import asyncio
 
+from typing import Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response, status
 from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
 
@@ -30,6 +31,7 @@ def init_bot_and_dispatcher():
 
 
 def create_app(bot=None, dp=None):
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         consumer_task = None
@@ -37,7 +39,6 @@ def create_app(bot=None, dp=None):
             setup_logger()
             app.state.bot, app.state.dp = init_bot_and_dispatcher()
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
-            app.state.api_key = os.getenv("API_KEY")
 
             # message queue consumer
             app.state.redis_consumer = create_consumer()
@@ -70,6 +71,7 @@ def create_app(bot=None, dp=None):
 
     app = FastAPI(lifespan=lifespan)
 
+
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         if isinstance(exc, HTTPException):
@@ -92,13 +94,12 @@ def create_app(bot=None, dp=None):
 
         return health_status
 
-    @app.post("/webhook")
+    webhook_secret = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
+    secret_verified = TelegramSecretVerifier(webhook_secret)
+
+    @app.post("/webhook", dependencies=[Depends(secret_verified.verify_telegram_secret)])
     async def webhook(request: Request):
         """Handle Telegram webhook updates."""
-        secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-        if secret != app.state.webhook_token:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
         try:
             # parse update
             update_data = await request.json()
@@ -112,10 +113,14 @@ def create_app(bot=None, dp=None):
 
         return Response(status_code=200)  # always return 200, unless unauthorized
 
-    async def verify_api_key(request: Request):
-        api_key = request.headers.get("X-API-Key")
-        if api_key != app.state.api_key:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        return True
 
     return app
+
+
+class TelegramSecretVerifier:
+    def __init__(self, secret):
+        self.secret = secret
+
+    async def verify_telegram_secret(self, request: Request, x_telegram_bot_api_secret_token: Annotated[str | None, Header(include_in_schema=False)] = None):
+        if x_telegram_bot_api_secret_token is None or x_telegram_bot_api_secret_token != self.secret:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")

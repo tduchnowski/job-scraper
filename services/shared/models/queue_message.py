@@ -7,7 +7,7 @@ class Payload(BaseModel):
     message: str
 
 
-class UserUpdate(BaseModel):
+class UserActivity(BaseModel):
     user_id: int
     chat_id: int
     username: str
