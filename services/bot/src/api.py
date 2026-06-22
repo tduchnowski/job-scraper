@@ -9,16 +9,14 @@ from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
 
 from services.bot.src.middleware import UserTrackingMiddleware
-from services.bot.src.consumers.notification import (
-    MessageProcessor,
-    create_notification_consumer,
-)
-from services.bot.src.producers.user_activity import create_user_activity_producer
+from services.bot.src.consumers.notification import MessageProcessor
+from services.bot.src.redis import create_consumer, create_producer
+from services.bot.src.subscription_service import SubscriptionService
 from services.shared.utils.logger import setup_logger
 from loguru import logger
 
 
-def init_bot_and_dispatcher():
+def init_bot_and_dispatcher(subscription_service: SubscriptionService):
     """Initialize bot and dispatcher together."""
     from services.bot.src.handlers import register_handlers
 
@@ -28,7 +26,7 @@ def init_bot_and_dispatcher():
 
     bot = Bot(token=token)
     dp = Dispatcher()
-    register_handlers(dp)
+    register_handlers(dp, subscription_service)
 
     return bot, dp
 
@@ -39,35 +37,51 @@ def create_app(bot=None, dp=None):
         consumer_task = None
         if bot is None and dp is None:
             setup_logger()
-            app.state.bot, app.state.dp = init_bot_and_dispatcher()
-            app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
 
-            # set up Redis
             redis_host = os.getenv("REDIS_HOST", "")
             redis_port = os.getenv("REDIS_PORT", "")
+
+            # initialize bot
+            subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
+            app.state.subscription_producer = create_producer(
+                redis_host, redis_port, subscription_topic
+            )
+            await app.state.subscription_producer.connect()
+            subs_service = SubscriptionService(app.state.subscription_producer)
+            app.state.bot, app.state.dp = init_bot_and_dispatcher(subs_service)
+            app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
+            message_processor = MessageProcessor(app.state.bot, app.state.dp)
+
             # message queue consumer
             redis_notification_topic = os.getenv("REDIS_NOTIFICATION_TOPIC", "")
             redis_notification_group = os.getenv("REDIS_NOTIFICATION_GROUP_NAME", "")
-            app.state.redis_consumer = create_notification_consumer(
+            app.state.notification_consumer = create_consumer(
                 redis_host,
                 redis_port,
                 redis_notification_topic,
                 redis_notification_group,
             )
-            await app.state.redis_consumer.connect()
-            message_processor = MessageProcessor(app.state.bot, app.state.dp)
+            await app.state.notification_consumer.connect()
             consumer_task = asyncio.create_task(
-                app.state.redis_consumer.consume(message_processor.process)
+                app.state.notification_consumer.consume(message_processor.process)
             )
 
             # user update producer
             redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
-            app.state.redis_producer = create_user_activity_producer(
+            app.state.user_activity_producer = create_producer(
                 redis_host, redis_port, redis_user_activity_topic
             )
-            await app.state.redis_producer.connect()
+            await app.state.user_activity_producer.connect()
+            # subscription update producer
+            redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
+            app.state.subscription_producer = create_producer(
+                redis_host, redis_port, redis_subscription_topic
+            )
+            await app.state.subscription_producer.connect()
+
+            # add middleware
             app.state.dp.message.middleware(
-                UserTrackingMiddleware(app.state.redis_producer)
+                UserTrackingMiddleware(app.state.user_activity_producer)
             )
 
         yield
@@ -79,10 +93,12 @@ def create_app(bot=None, dp=None):
             except asyncio.CancelledError:
                 pass
 
-        if app.state.redis_consumer:
-            await app.state.redis_consumer.close()
-        if app.state.redis_producer:
-            await app.state.redis_producer.close()
+        if app.state.notification_consumer:
+            await app.state.notification_consumer.close()
+        if app.state.user_activity_producer:
+            await app.state.user_activity_producer.close()
+        if app.state.subscription_producer:
+            await app.state.subscription_producer.close()
 
     app = FastAPI(lifespan=lifespan)
 

@@ -1,8 +1,8 @@
 from aiogram import Bot
 
-from shared.config.scraping import LOCATIONS, SEARCH_QUERIES
-from shared.models.notification import Notification
-from shared.models.user import User
+from services.shared.config.scraping import LOCATIONS, SEARCH_QUERIES
+from services.shared.models.notification import Notification
+from services.shared.models.user import User
 
 
 def are_args_valid(text: str) -> tuple[bool, str]:

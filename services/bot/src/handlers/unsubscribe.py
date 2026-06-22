@@ -1,12 +1,7 @@
 from aiogram.types import Message
-from loguru import logger
-from sqlalchemy.exc import SQLAlchemyError
-
-from jobscraper.bot.messages import are_args_valid
-from jobscraper.bot.subscription_service import (
-    RemoveSubscriptionResult,
-    SubscriptionService,
-)
+from services.bot.src.messages import are_args_valid
+from services.bot.src.subscription_service import SubscriptionService
+from services.shared.models.queue_message import SubscribeOperation
 
 
 async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
@@ -21,25 +16,22 @@ async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
     _, category, location = message.text.split()
     category, location = category.upper(), location.upper()
 
-    result = RemoveSubscriptionResult.FAILED
-    try:
-        result = await subs_service.unsubscribe(
-            message.from_user.id, category, location
-        )
-    except SQLAlchemyError as e:
-        logger.error(f"Session fail: {e}")
-
-    response_text = format_response(result, category, location)
-    await message.answer(response_text, parse_mode="markdown")
+    success = await subs_service.update(
+        message.from_user.id, category, location, SubscribeOperation.REMOVE
+    )
+    if not success:
+        response_text = "❌ Failed to remove subscription. Please try again later"
+        await message.answer(response_text, parse_mode="markdown")
+    # user will be notified later when the update reaches storage
 
 
-def format_response(
-    remove_subscription_result: RemoveSubscriptionResult, category: str, location: str
-) -> str:
-    """Format removal result into user-facing markdown message."""
-    if remove_subscription_result == RemoveSubscriptionResult.REMOVED:
-        return f"✅ You won't receive notifications for {category} -> {location}"
-    elif remove_subscription_result == RemoveSubscriptionResult.NOT_EXIST:
-        return f"✅ You're already not subscribed to {category} -> {location}"
-    else:
-        return "❌ Failed to remove subscription. Please try again later"
+# def format_response(
+#     remove_subscription_result: RemoveSubscriptionResult, category: str, location: str
+# ) -> str:
+#     """Format removal result into user-facing markdown message."""
+#     if remove_subscription_result == RemoveSubscriptionResult.REMOVED:
+#         return f"✅ You won't receive notifications for {category} -> {location}"
+#     elif remove_subscription_result == RemoveSubscriptionResult.NOT_EXIST:
+#         return f"✅ You're already not subscribed to {category} -> {location}"
+#     else:
+#         return "❌ Failed to remove subscription. Please try again later"
