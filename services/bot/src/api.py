@@ -71,7 +71,6 @@ def create_app(bot=None, dp=None):
 
     app = FastAPI(lifespan=lifespan)
 
-
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         if isinstance(exc, HTTPException):
@@ -97,7 +96,9 @@ def create_app(bot=None, dp=None):
     webhook_secret = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
     secret_verified = TelegramSecretVerifier(webhook_secret)
 
-    @app.post("/webhook", dependencies=[Depends(secret_verified.verify_telegram_secret)])
+    @app.post(
+        "/webhook", dependencies=[Depends(secret_verified.verify_telegram_secret)]
+    )
     async def webhook(request: Request):
         """Handle Telegram webhook updates."""
         try:
@@ -113,7 +114,6 @@ def create_app(bot=None, dp=None):
 
         return Response(status_code=200)  # always return 200, unless unauthorized
 
-
     return app
 
 
@@ -121,6 +121,17 @@ class TelegramSecretVerifier:
     def __init__(self, secret):
         self.secret = secret
 
-    async def verify_telegram_secret(self, request: Request, x_telegram_bot_api_secret_token: Annotated[str | None, Header(include_in_schema=False)] = None):
-        if x_telegram_bot_api_secret_token is None or x_telegram_bot_api_secret_token != self.secret:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    async def verify_telegram_secret(
+        self,
+        request: Request,
+        x_telegram_bot_api_secret_token: Annotated[
+            str | None, Header(include_in_schema=False)
+        ] = None,
+    ):
+        if (
+            x_telegram_bot_api_secret_token is None
+            or x_telegram_bot_api_secret_token != self.secret
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
