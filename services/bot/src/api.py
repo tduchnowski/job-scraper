@@ -10,9 +10,9 @@ from aiogram import types, Bot, Dispatcher
 
 from services.bot.src.middleware import UserTrackingMiddleware
 from services.bot.src.consumers.notification import MessageProcessor
-from services.bot.src.redis import create_consumer, create_producer
 from services.bot.src.subscription_service import SubscriptionService
 from services.shared.utils.logger import setup_logger
+from services.shared.infra.redis import create_consumer, create_producer
 from loguru import logger
 
 
