@@ -2,10 +2,9 @@ import os
 from redisaq import Producer
 
 
-def create_producer(maxlen: int = 1000) -> Producer:
-    host = os.getenv("REDIS_HOST")
-    port = os.getenv("REDIS_PORT")
-    topic = os.getenv("REDIS_QUEUE_USER_UPDATE_TOPIC")
+def create_user_activity_producer(
+    host: str, port: str, topic: str, maxlen: int = 1000
+) -> Producer:
     if not (host and port and topic):
         raise ValueError(
             f"Can't create a user update queue producer. host={host}, port={port}, topic={topic}"

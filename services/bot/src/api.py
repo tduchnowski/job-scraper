@@ -9,8 +9,11 @@ from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
 
 from services.bot.src.middleware import UserTrackingMiddleware
-from services.bot.src.notifications_consumer import MessageProcessor, create_consumer
-from services.bot.src.queue_user import create_producer
+from services.bot.src.consumers.notification import (
+    MessageProcessor,
+    create_notification_consumer,
+)
+from services.bot.src.producers.user_activity import create_user_activity_producer
 from services.shared.utils.logger import setup_logger
 from loguru import logger
 
@@ -31,7 +34,6 @@ def init_bot_and_dispatcher():
 
 
 def create_app(bot=None, dp=None):
-
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         consumer_task = None
@@ -40,8 +42,18 @@ def create_app(bot=None, dp=None):
             app.state.bot, app.state.dp = init_bot_and_dispatcher()
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
 
+            # set up Redis
+            redis_host = os.getenv("REDIS_HOST", "")
+            redis_port = os.getenv("REDIS_PORT", "")
             # message queue consumer
-            app.state.redis_consumer = create_consumer()
+            redis_notification_topic = os.getenv("REDIS_NOTIFICATION_TOPIC", "")
+            redis_notification_group = os.getenv("REDIS_NOTIFICATION_GROUP_NAME", "")
+            app.state.redis_consumer = create_notification_consumer(
+                redis_host,
+                redis_port,
+                redis_notification_topic,
+                redis_notification_group,
+            )
             await app.state.redis_consumer.connect()
             message_processor = MessageProcessor(app.state.bot, app.state.dp)
             consumer_task = asyncio.create_task(
@@ -49,7 +61,10 @@ def create_app(bot=None, dp=None):
             )
 
             # user update producer
-            app.state.redis_producer = create_producer()
+            redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
+            app.state.redis_producer = create_user_activity_producer(
+                redis_host, redis_port, redis_user_activity_topic
+            )
             await app.state.redis_producer.connect()
             app.state.dp.message.middleware(
                 UserTrackingMiddleware(app.state.redis_producer)

@@ -14,12 +14,14 @@ class MessageProcessor:
         await self.bot.send_message(chat_id=payload.chat_id, text=payload.message)
 
 
-def create_consumer(batch_size: int = 10, heartbeat_interval: float = 3.0) -> Consumer:
-    host = os.getenv("REDIS_HOST")
-    port = os.getenv("REDIS_PORT")
-    topic = os.getenv("REDIS_QUEUE_NOTIFICATIONS_TOPIC")
-    group_name = os.getenv("REDIS_QUEUE_NOTIFICATIONS_GROUP_NAME")
-
+def create_notification_consumer(
+    host: str,
+    port: str,
+    topic: str,
+    group_name: str,
+    batch_size: int = 10,
+    heartbeat_interval: float = 3.0,
+) -> Consumer:
     if not (host and port and topic and group_name):
         raise ValueError(
             f"Missing Redis environment variables. host={host}, port={port}, topic={topic}, group_name={group_name}"
