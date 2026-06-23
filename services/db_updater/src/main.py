@@ -3,6 +3,7 @@ import asyncio
 
 
 from services.db_updater.src.consumer.handlers import (
+    process_notification,
     process_user_activity,
     process_subscription,
 )
@@ -25,6 +26,14 @@ def subscription_worker(host: str, port: str):
     )
 
 
+def notification_worker(host: str, port: str):
+    notification_topic = os.getenv("REDIS_NOTIFICATION_TOPIC", "")
+    notification_group = os.getenv("REDIS_NOTIFICATION_GROUP_NAME", "")
+    return worker(
+        host, port, notification_topic, notification_group, process_notification
+    )
+
+
 async def main():
     # create redis consumers
     redis_host = os.getenv("REDIS_HOST", "")
@@ -32,6 +41,7 @@ async def main():
     workers = [
         asyncio.create_task(user_activity_worker(redis_host, redis_port)),
         asyncio.create_task(subscription_worker(redis_host, redis_port)),
+        asyncio.create_task(notification_worker(redis_host, redis_port)),
     ]
     await asyncio.gather(*workers)
 

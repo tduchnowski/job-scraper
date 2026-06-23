@@ -26,3 +26,13 @@ class SubscriptionUpdate(BaseModel):
     operation: SubscribeOperation  # add, remove subscription
     category: str
     location: str
+
+
+class NotificationStatus(Enum):
+    PENDING = 0
+    DELIVERED = 1
+
+
+class NotificationUpdate(BaseModel):
+    notification_id: int
+    status: NotificationStatus
