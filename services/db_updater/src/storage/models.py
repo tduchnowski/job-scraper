@@ -1,0 +1,178 @@
+from sqlalchemy import (
+    Index,
+    Integer,
+    String,
+    Text,
+    Boolean,
+    ForeignKey,
+    UniqueConstraint,
+    Enum as SAEnum,
+)
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime, timezone
+from typing import Optional, List
+
+from services.shared.models.job import JobCategory, JobStatus
+from services.db_updater.src.storage.base import Base
+
+
+class JobORM(Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    url: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String)
+    company: Mapped[str] = mapped_column(String)
+    category: Mapped[Optional[JobCategory]] = mapped_column(
+        SAEnum(JobCategory), nullable=True
+    )
+    location: Mapped[str] = mapped_column(String, nullable=True)
+
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    salary: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    job_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    skills: Mapped[Optional[List[str]]] = mapped_column(JSONB, nullable=True)
+    seniority: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    status: Mapped[JobStatus] = mapped_column(SAEnum(JobStatus), default=JobStatus.NEW)
+
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    scraped_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+
+class UserORM(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)  # Telegram user_id
+    chat_id: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    is_active: Mapped[bool] = mapped_column(nullable=False, server_default="1")
+    username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_interaction: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    subscriptions: Mapped[list["UserSubscriptionORM"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class UserSubscriptionORM(Base):
+    __tablename__ = "user_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    category: Mapped[JobCategory] = mapped_column(SAEnum(JobCategory), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_notified_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    user: Mapped["UserORM"] = relationship(back_populates="subscriptions")
+    # notifications: Mapped[list["NotificationORM"]] = relationship(
+    #     back_populates="subscription",
+    #     cascade="all, delete-orphan"
+    # )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "category", "location", name="unique_user_subscription"
+        ),
+    )
+
+
+class NotificationORM(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "user_subscriptions.id",
+            name="fk_notifications_subscription_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    # --- delivery state ---
+    status: Mapped[str] = mapped_column(
+        default="pending",  # pending | processing | sent | failed
+        nullable=False,
+    )
+
+    attempts: Mapped[int] = mapped_column(
+        default=0,
+        nullable=False,
+    )
+
+    # --- retry control ---
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+    )
+
+    # --- timestamps ---
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # --- relationships ---
+    user: Mapped["UserORM"] = relationship(foreign_keys=[user_id])
+    job: Mapped["JobORM"] = relationship(foreign_keys=[job_id])
+    subscription: Mapped["UserSubscriptionORM"] = relationship(
+        foreign_keys=[subscription_id],
+        # back_populates="notifications"
+    )
+
+    # --- constraints ---
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_notification"),
+        Index("idx_notifications_status_next_attempt", "status", "next_attempt_at"),
+        Index("idx_notifications_user_id", "user_id"),
+    )

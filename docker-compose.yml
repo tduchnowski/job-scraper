@@ -1,4 +1,32 @@
 services:
+  db:
+    image: postgres:17
+    container_name: postgres-dev
+    restart: always
+    environment:
+      POSTGRES_USER: it-jobs-worldwide
+      POSTGRES_PASSWORD: ijw
+      POSTGRES_DB: it_jobs_worldwide_db
+    ports:
+      - "5432:5432"
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    restart: unless-stopped
+
   redis:
     image: redis:8.8-alpine
     container_name: redis_server
@@ -20,5 +48,7 @@ services:
       - redis
 
 volumes:
+  postgres_data:
+  pgadmin_data:
   redis_data:
   redisinsight_data:
