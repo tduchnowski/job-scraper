@@ -4,38 +4,56 @@ import asyncio
 
 from services.db_updater.src.storage.session import get_session_local, set_session_local
 from services.db_updater.src.consumer.handlers import (
+    JobStatusHandler,
+    NewJobHandler,
+    NewNotificationHandler,
     UserActivityHandler,
     SubscriptionHandler,
-    NotificationHandler,
+    NotificationStatusHandler,
 )
 from services.db_updater.src.consumer.worker import worker
 
 
 # TODO: make one function out of the following three, its basically the same thing
-def user_activity_worker(host: str, port: str):
+def user_activity_worker(host: str, port: str, workers_group: str):
     user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
-    user_activity_group = os.getenv("REDIS_USER_ACTIVITY_GROUP_NAME", "")
     user_activity_handler = UserActivityHandler(get_session_local())
-    return worker(
-        host, port, user_activity_topic, user_activity_group, user_activity_handler
-    )
+    return worker(host, port, user_activity_topic, workers_group, user_activity_handler)
 
 
-def subscription_worker(host: str, port: str):
+def subscription_worker(host: str, port: str, workers_group: str):
     subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
-    subscription_group = os.getenv("REDIS_SUBSCRIPTION_GROUP_NAME", "")
     subscription_handler = SubscriptionHandler(get_session_local())
+    return worker(host, port, subscription_topic, workers_group, subscription_handler)
+
+
+def notification_status_worker(host: str, port: str, workers_group: str):
+    notification_topic = os.getenv("REDIS_NOTIFICATION_STATUS_TOPIC", "")
+    notification_handler = NotificationStatusHandler(get_session_local())
+    return worker(host, port, notification_topic, workers_group, notification_handler)
+
+
+def new_notification_worker(host: str, port: str, workers_group: str):
+    new_notification_topic = os.getenv("REDIS_NEW_NOTIFICATION_TOPIC", "")
+    notification_handler = NewNotificationHandler(get_session_local())
     return worker(
-        host, port, subscription_topic, subscription_group, subscription_handler
+        host, port, new_notification_topic, workers_group, notification_handler
     )
 
 
-def notification_worker(host: str, port: str):
-    notification_topic = os.getenv("REDIS_NOTIFICATION_TOPIC", "")
-    notification_group = os.getenv("REDIS_NOTIFICATION_GROUP_NAME", "")
-    notification_handler = NotificationHandler(get_session_local())
+def new_job_worker(host: str, port: str, workers_group: str):
+    new_notification_topic = os.getenv("REDIS_NEW_JOB_TOPIC", "")
+    notification_handler = NewJobHandler(get_session_local())
     return worker(
-        host, port, notification_topic, notification_group, notification_handler
+        host, port, new_notification_topic, workers_group, notification_handler
+    )
+
+
+def job_status_worker(host: str, port: str, workers_group: str):
+    new_notification_topic = os.getenv("REDIS_JOB_STATUS_TOPIC", "")
+    notification_handler = JobStatusHandler(get_session_local())
+    return worker(
+        host, port, new_notification_topic, workers_group, notification_handler
     )
 
 
@@ -44,10 +62,20 @@ async def main():
     set_session_local()
     redis_host = os.getenv("REDIS_HOST", "")
     redis_port = os.getenv("REDIS_PORT", "")
+    workers_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
     workers = [
-        asyncio.create_task(user_activity_worker(redis_host, redis_port)),
-        asyncio.create_task(subscription_worker(redis_host, redis_port)),
-        asyncio.create_task(notification_worker(redis_host, redis_port)),
+        asyncio.create_task(
+            user_activity_worker(redis_host, redis_port, workers_group)
+        ),
+        asyncio.create_task(subscription_worker(redis_host, redis_port, workers_group)),
+        asyncio.create_task(
+            notification_status_worker(redis_host, redis_port, workers_group)
+        ),
+        asyncio.create_task(
+            new_notification_worker(redis_host, redis_port, workers_group)
+        ),
+        asyncio.create_task(new_job_worker(redis_host, redis_port, workers_group)),
+        asyncio.create_task(job_status_worker(redis_host, redis_port, workers_group)),
     ]
     await asyncio.gather(*workers)
 

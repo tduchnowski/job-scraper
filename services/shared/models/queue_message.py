@@ -3,6 +3,9 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import UTC, datetime
 
+from services.db_updater.src.storage.models import NotificationStatus
+from services.shared.models.job import JobCategory, JobStatus
+
 
 class Payload(BaseModel):
     chat_id: int
@@ -28,11 +31,26 @@ class SubscriptionUpdate(BaseModel):
     location: str
 
 
-class NotificationStatus(Enum):
-    PENDING = 0
-    DELIVERED = 1
-
-
 class NotificationUpdate(BaseModel):
     notification_id: int
     status: NotificationStatus
+
+
+class NewNotification(BaseModel):
+    user_id: int
+    job_id: str
+    subscription_id: int
+
+
+class JobUpdate(BaseModel):
+    job_id: str
+    status: JobStatus
+
+
+class NewJob(BaseModel):
+    url: str
+    title: str
+    company: str
+    category: JobCategory
+    location: str
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

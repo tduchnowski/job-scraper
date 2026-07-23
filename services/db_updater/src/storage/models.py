@@ -1,3 +1,4 @@
+from enum import Enum
 from sqlalchemy import (
     Index,
     Integer,
@@ -108,6 +109,12 @@ class UserSubscriptionORM(Base):
     )
 
 
+class NotificationStatus(str, Enum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
+
 class NotificationORM(Base):
     __tablename__ = "notifications"
 
@@ -134,7 +141,7 @@ class NotificationORM(Base):
 
     # --- delivery state ---
     status: Mapped[str] = mapped_column(
-        default="pending",  # pending | processing | sent | failed
+        default="pending",  # pending | delivered | failed
         nullable=False,
     )
 
