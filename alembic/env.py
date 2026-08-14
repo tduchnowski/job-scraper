@@ -10,17 +10,22 @@ from sqlalchemy import pool
 from alembic import context
 
 from jobscraper.config.env import setup_env
+from services.shared.config.env import setup_env
 
 # -- my additions
 sys.path.append(str(Path(__file__).parent.parent))
 
-from jobscraper.storage.base import Base
-from jobscraper.storage.models import (
+from services.shared.storage.base import Base
+from services.shared.storage.models import (
     JobORM,
     UserORM,
     UserSubscriptionORM,
     NotificationORM,
 )
+
+_keep_imports = [JobORM, UserORM, UserSubscriptionORM, NotificationORM]
+
+print("ALEMBIC DEBUG - Registered Tables:", Base.metadata.tables.keys())
 
 # ---
 
@@ -52,10 +57,11 @@ def get_sync_db_url():
     password = os.getenv("POSTGRES_PASSWORD")
     host = os.getenv("POSTGRES_HOST")
     db = os.getenv("POSTGRES_DB")
+    print("HOST", host)
     return f"postgresql+psycopg2://{user}:{password}@{host}/{db}"
 
 
-setup_env()
+setup_env("./.env.dev")
 config.set_main_option("sqlalchemy.url", get_sync_db_url())
 
 

@@ -3,7 +3,8 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import UTC, datetime
 
-from services.db_updater.src.storage.models import NotificationStatus
+# from services.db_updater.src.storage.models import NotificationStatus
+from services.shared.storage.models import NotificationStatus
 from services.shared.models.job import JobCategory, JobStatus
 
 
@@ -48,6 +49,7 @@ class JobUpdate(BaseModel):
 
 
 class NewJob(BaseModel):
+    id: str
     url: str
     title: str
     company: str

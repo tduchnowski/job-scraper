@@ -2,12 +2,19 @@ from abc import ABC, abstractmethod
 from redisaq import Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from services.db_updater.src.storage.models import (
+from services.shared.storage.models import (
     JobORM,
     NotificationORM,
     UserORM,
     UserSubscriptionORM,
 )
+
+# from services.db_updater.src.storage.models import (
+#     JobORM,
+#     NotificationORM,
+#     UserORM,
+#     UserSubscriptionORM,
+# )
 from services.shared.models.queue_message import (
     JobUpdate,
     NewJob,
@@ -113,6 +120,7 @@ class NewJobHandler(ConsumerHandler):
         async with self.session_maker() as session:
             # TODO: add exception handling
             job_orm = JobORM(
+                id=job.id,
                 url=job.url,
                 title=job.title,
                 company=job.company,

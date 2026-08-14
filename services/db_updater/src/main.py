@@ -17,44 +17,38 @@ from services.db_updater.src.consumer.worker import worker
 # TODO: make one function out of the following three, its basically the same thing
 def user_activity_worker(host: str, port: str, workers_group: str):
     user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
-    user_activity_handler = UserActivityHandler(get_session_local())
-    return worker(host, port, user_activity_topic, workers_group, user_activity_handler)
+    handler = UserActivityHandler(get_session_local())
+    return worker(host, port, user_activity_topic, workers_group, handler)
 
 
 def subscription_worker(host: str, port: str, workers_group: str):
     subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
-    subscription_handler = SubscriptionHandler(get_session_local())
-    return worker(host, port, subscription_topic, workers_group, subscription_handler)
+    handler = SubscriptionHandler(get_session_local())
+    return worker(host, port, subscription_topic, workers_group, handler)
 
 
 def notification_status_worker(host: str, port: str, workers_group: str):
     notification_topic = os.getenv("REDIS_NOTIFICATION_STATUS_TOPIC", "")
-    notification_handler = NotificationStatusHandler(get_session_local())
-    return worker(host, port, notification_topic, workers_group, notification_handler)
+    handler = NotificationStatusHandler(get_session_local())
+    return worker(host, port, notification_topic, workers_group, handler)
 
 
 def new_notification_worker(host: str, port: str, workers_group: str):
     new_notification_topic = os.getenv("REDIS_NEW_NOTIFICATION_TOPIC", "")
-    notification_handler = NewNotificationHandler(get_session_local())
-    return worker(
-        host, port, new_notification_topic, workers_group, notification_handler
-    )
+    handler = NewNotificationHandler(get_session_local())
+    return worker(host, port, new_notification_topic, workers_group, handler)
 
 
 def new_job_worker(host: str, port: str, workers_group: str):
     new_notification_topic = os.getenv("REDIS_NEW_JOB_TOPIC", "")
-    notification_handler = NewJobHandler(get_session_local())
-    return worker(
-        host, port, new_notification_topic, workers_group, notification_handler
-    )
+    handler = NewJobHandler(get_session_local())
+    return worker(host, port, new_notification_topic, workers_group, handler)
 
 
 def job_status_worker(host: str, port: str, workers_group: str):
     new_notification_topic = os.getenv("REDIS_JOB_STATUS_TOPIC", "")
-    notification_handler = JobStatusHandler(get_session_local())
-    return worker(
-        host, port, new_notification_topic, workers_group, notification_handler
-    )
+    handler = JobStatusHandler(get_session_local())
+    return worker(host, port, new_notification_topic, workers_group, handler)
 
 
 async def main():

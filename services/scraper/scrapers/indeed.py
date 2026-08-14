@@ -1,24 +1,23 @@
-import asyncio
 import aiohttp
-from bs4 import BeautifulSoup
 from loguru import logger
-from jobscraper.config.scraping_config import INDEED_DOMAINS
-from jobscraper.models.job import Job
+from asyncio import Semaphore
+from bs4 import BeautifulSoup
+from services.scraper.scrapers.scraper_base import Scraper
+from services.shared.models.job import Job
+from services.shared.config.scraping import INDEED_DOMAINS
 
 
-class IndeedScraper:
+class IndeedScraper(Scraper):
     def __init__(
-        self,
-        session: aiohttp.ClientSession | None,
-        semaphore: asyncio.Semaphore,
-        location: str,
+        self, http_session: aiohttp.ClientSession, sem: Semaphore, location: str
     ):
+        super().__init__(http_session, sem, location)
         domain = INDEED_DOMAINS.get(location, "https://indeed.com")
         self._base_url = f"{domain}/jobs"
         self._jobview_url = f"{domain}/viewjob"
-        self._session = session
-        self.location = location
-        self.sem = semaphore
+        # self._session = http_session
+        # self.location = location
+        # self.sem = sem
 
     async def scrape_job_list(self, query: str) -> list[Job]:
         logger.debug(f"Scraping Indeed, query={query}, location={self.location}")
