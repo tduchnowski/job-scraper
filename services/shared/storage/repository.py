@@ -2,18 +2,18 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Sequence, Tuple
+from typing import AsyncGenerator, Sequence
 
 from sqlalchemy.orm.strategy_options import selectinload
 
-from jobscraper.models.job import Job, JobStatus
-from jobscraper.storage.models import (
+from services.shared.models.job import JobStatus
+from services.shared.storage.models import (
     JobORM,
     NotificationORM,
     UserORM,
     UserSubscriptionORM,
 )
-from jobscraper.storage.mappers import job_to_orm
+# from jobscraper.storage.mappers import job_to_orm
 
 
 class UpsertResult(Enum):
@@ -27,43 +27,47 @@ class JobRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def upsert(self, job: Job) -> Tuple[JobORM, UpsertResult]:
-        """Insert job if not exists, otherwise update. Returns ORM object and result."""
-        existing = await self.session.get(JobORM, job.id)
+    # async def upsert(self, job: Job) -> Tuple[JobORM, UpsertResult]:
+    #     """Insert job if not exists, otherwise update. Returns ORM object and result."""
+    #     existing = await self.session.get(JobORM, job.id)
+    #
+    #     if existing:
+    #         for k, v in job.model_dump().items():
+    #             setattr(existing, k, v)
+    #         result = UpsertResult.UPDATED
+    #         orm_obj = existing
+    #     else:
+    #         orm_obj = job_to_orm(job)
+    #         self.session.add(orm_obj)
+    #         result = UpsertResult.CREATED
+    #
+    #     await self.session.commit()
+    #     return orm_obj, result
+    #
+    # async def upsert_batch(self, jobs: list[Job]) -> int:
+    #     """Upsert batch of jobs. Returns count of jobs processed."""
+    #     jobs_orm = [job_to_orm(job) for job in jobs]
+    #     for job_orm in jobs_orm:
+    #         await self.session.merge(job_orm)
+    #     return len(jobs_orm)
+    #
+    # async def get(self, job_id: str) -> Optional[JobORM]:
+    #     """Get job by ID."""
+    #     return await self.session.get(JobORM, job_id)
 
-        if existing:
-            for k, v in job.model_dump().items():
-                setattr(existing, k, v)
-            result = UpsertResult.UPDATED
-            orm_obj = existing
-        else:
-            orm_obj = job_to_orm(job)
-            self.session.add(orm_obj)
-            result = UpsertResult.CREATED
-
-        await self.session.commit()
-        return orm_obj, result
-
-    async def upsert_batch(self, jobs: list[Job]) -> int:
-        """Upsert batch of jobs. Returns count of jobs processed."""
-        jobs_orm = [job_to_orm(job) for job in jobs]
-        for job_orm in jobs_orm:
-            await self.session.merge(job_orm)
-        return len(jobs_orm)
-
-    async def get(self, job_id: str) -> Optional[JobORM]:
-        """Get job by ID."""
-        return await self.session.get(JobORM, job_id)
-
-    async def get_new_jobs(self) -> Sequence[JobORM]:
-        """Get all jobs with NEW status, ordered by creation date."""
+    async def stream_new_jobs(
+        self, max_jobs: int = 100
+    ) -> AsyncGenerator[JobORM, None]:
+        """Stream jobs one by one"""
         query = (
             select(JobORM)
             .where(JobORM.status == JobStatus.NEW)
-            .order_by(JobORM.created_at.asc())
+            .order_by(func.random())
+            .limit(max_jobs)
         )
-        res = await self.session.execute(query)
-        return res.scalars().all()
+        res = await self.session.stream(query)
+        async for job in res.scalars():
+            yield job
 
     async def update_status(self, job_id: str, status: str):
         """Update job status."""

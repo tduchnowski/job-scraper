@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
 
     redis_host = os.getenv("REDIS_HOST", "")
     redis_port = os.getenv("REDIS_PORT", "")
-    job_topic = os.getenv("REDIS_NEW_JOB_TOPIC", "")
+    job_topic = os.getenv("REDIS_NEW_JOBS_TOPIC", "")
 
     app.state.job_producer = create_producer(redis_host, redis_port, job_topic)
     await app.state.job_producer.connect()

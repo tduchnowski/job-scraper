@@ -22,7 +22,7 @@ def user_activity_worker(host: str, port: str, workers_group: str):
 
 
 def subscription_worker(host: str, port: str, workers_group: str):
-    subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
+    subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
     handler = SubscriptionHandler(get_session_local())
     return worker(host, port, subscription_topic, workers_group, handler)
 
@@ -34,13 +34,13 @@ def notification_status_worker(host: str, port: str, workers_group: str):
 
 
 def new_notification_worker(host: str, port: str, workers_group: str):
-    new_notification_topic = os.getenv("REDIS_NEW_NOTIFICATION_TOPIC", "")
+    new_notification_topic = os.getenv("REDIS_FAILED_NOTIFICATIONS_TOPIC", "")
     handler = NewNotificationHandler(get_session_local())
     return worker(host, port, new_notification_topic, workers_group, handler)
 
 
 def new_job_worker(host: str, port: str, workers_group: str):
-    new_notification_topic = os.getenv("REDIS_NEW_JOB_TOPIC", "")
+    new_notification_topic = os.getenv("REDIS_NEW_JOBS_TOPIC", "")
     handler = NewJobHandler(get_session_local())
     return worker(host, port, new_notification_topic, workers_group, handler)
 

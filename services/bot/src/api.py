@@ -42,7 +42,7 @@ def create_app(bot=None, dp=None):
             redis_port = os.getenv("REDIS_PORT", "")
 
             # initialize bot
-            subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
+            subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
                 redis_host, redis_port, subscription_topic
             )
@@ -53,8 +53,10 @@ def create_app(bot=None, dp=None):
             message_processor = MessageProcessor(app.state.bot, app.state.dp)
 
             # message queue consumer
-            redis_notification_topic = os.getenv("REDIS_NOTIFICATION_TOPIC", "")
-            redis_notification_group = os.getenv("REDIS_NOTIFICATION_GROUP_NAME", "")
+            redis_notification_topic = os.getenv("REDIS_NOTIFICATIONS_TOPIC", "")
+            redis_notification_group = os.getenv(
+                "REDIS_TELEGRAM_WORKERS_GROUP_NAME", ""
+            )
             app.state.notification_consumer = create_consumer(
                 redis_host,
                 redis_port,
@@ -72,12 +74,22 @@ def create_app(bot=None, dp=None):
                 redis_host, redis_port, redis_user_activity_topic
             )
             await app.state.user_activity_producer.connect()
+
             # subscription update producer
-            redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTION_TOPIC", "")
+            redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
                 redis_host, redis_port, redis_subscription_topic
             )
             await app.state.subscription_producer.connect()
+
+            # failed notifications producer
+            redis_failed_notifications_topic = os.getenv(
+                "REDIS_FAILED_NOTIFICATIONS_TOPIC", ""
+            )
+            app.state.failed_notifications_producer = create_producer(
+                redis_host, redis_port, redis_failed_notifications_topic
+            )
+            await app.state.failed_notifications_producer.connect()
 
             # add middleware
             app.state.dp.message.middleware(
