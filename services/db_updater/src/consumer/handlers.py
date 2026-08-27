@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from loguru import logger
 from redisaq import Message
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from services.shared.storage.models import (
     JobORM,
@@ -94,14 +96,19 @@ class NewNotificationHandler(ConsumerHandler):
     async def process(self, message: Message):
         notification = NewNotification.model_validate(message.payload)
         async with self.session_maker() as session:
-            # TODO: add exception handling
-            notification_orm = NotificationORM(
-                user_id=notification.user_id,
-                job_id=notification.job_id,
-                subscription_id=notification.subscription_id,
-            )
-            await session.merge(notification_orm)
-            await session.commit()
+            try:
+                notification_orm = NotificationORM(
+                    user_id=notification.user_id,
+                    job_id=notification.job_id,
+                    subscription_id=notification.subscription_id,
+                )
+                await session.merge(notification_orm)
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
+                logger.info(
+                    f"Duplicate notification. Skipping. (user_id, job_id)=({notification.user_id}, {notification.job_id})"
+                )
 
 
 class JobStatusHandler(ConsumerHandler):
@@ -109,7 +116,7 @@ class JobStatusHandler(ConsumerHandler):
         job_status = JobUpdate.model_validate(message.payload)
         async with self.session_maker() as session:
             # TODO: add exception handling
-            job_orm = JobORM(job_id=job_status.job_id, status=job_status.status)
+            job_orm = JobORM(id=job_status.job_id, status=job_status.status)
             await session.merge(job_orm)
             await session.commit()
 

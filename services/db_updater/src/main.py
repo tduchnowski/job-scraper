@@ -33,8 +33,8 @@ def notification_status_worker(host: str, port: str, workers_group: str):
     return worker(host, port, notification_topic, workers_group, handler)
 
 
-def new_notification_worker(host: str, port: str, workers_group: str):
-    new_notification_topic = os.getenv("REDIS_FAILED_NOTIFICATIONS_TOPIC", "")
+def notifications_worker(host: str, port: str, workers_group: str):
+    new_notification_topic = os.getenv("REDIS_NOTIFICATIONS_TOPIC", "")
     handler = NewNotificationHandler(get_session_local())
     return worker(host, port, new_notification_topic, workers_group, handler)
 
@@ -54,19 +54,21 @@ def job_status_worker(host: str, port: str, workers_group: str):
 async def main():
     # create redis consumers
     set_session_local()
+    for key, val in os.environ.items():
+        print(key, val)
     redis_host = os.getenv("REDIS_HOST", "")
     redis_port = os.getenv("REDIS_PORT", "")
     workers_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
     workers = [
+        asyncio.create_task(subscription_worker(redis_host, redis_port, workers_group)),
         asyncio.create_task(
             user_activity_worker(redis_host, redis_port, workers_group)
         ),
-        asyncio.create_task(subscription_worker(redis_host, redis_port, workers_group)),
         asyncio.create_task(
             notification_status_worker(redis_host, redis_port, workers_group)
         ),
         asyncio.create_task(
-            new_notification_worker(redis_host, redis_port, workers_group)
+            notifications_worker(redis_host, redis_port, workers_group)
         ),
         asyncio.create_task(new_job_worker(redis_host, redis_port, workers_group)),
         asyncio.create_task(job_status_worker(redis_host, redis_port, workers_group)),

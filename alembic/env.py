@@ -13,6 +13,8 @@ from jobscraper.config.env import setup_env
 from services.shared.config.env import setup_env
 
 # -- my additions
+import alembic_postgresql_enum
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 from services.shared.storage.base import Base

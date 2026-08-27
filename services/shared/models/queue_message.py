@@ -12,6 +12,12 @@ class Payload(BaseModel):
     message: str
 
 
+# class TelegramNotification(BaseModel):
+#     chat_id: int
+#     notification_id: int
+#     job: Job
+
+
 class UserActivity(BaseModel):
     user_id: int
     chat_id: int

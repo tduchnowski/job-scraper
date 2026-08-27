@@ -36,6 +36,7 @@ class JobCategory(str, Enum):
     SRE = "SRE"
     QA = "QA"
     DATA_SCIENCE = "DATA_SCIENCE"
+    UNKNOWN = "UNKNOWN"
 
 
 class JobLocation(str, Enum):
@@ -102,6 +103,7 @@ class JobLocation(str, Enum):
     KENYA = "KENYA"
 
     REMOTE = "REMOTE"
+    UNKNOWN = "UNKNOWN"
 
 
 class Job(BaseModel):
@@ -111,8 +113,8 @@ class Job(BaseModel):
     title: str
     company: str
 
-    category: Optional[JobCategory] = None
-    location: Optional[JobLocation] = None
+    category: JobCategory
+    location: JobLocation
     description: Optional[str] = None
     salary: Optional[str] = None
     job_type: Optional[str] = None  # full-time, contract, etc.

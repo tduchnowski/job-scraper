@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from services.shared.models.job import JobCategory, JobStatus
+from services.shared.models.job import JobCategory, JobLocation, JobStatus
 from services.shared.storage.base import Base
 
 
@@ -26,10 +26,8 @@ class JobORM(Base):
     url: Mapped[str] = mapped_column(String)
     title: Mapped[str] = mapped_column(String)
     company: Mapped[str] = mapped_column(String)
-    category: Mapped[Optional[JobCategory]] = mapped_column(
-        SAEnum(JobCategory), nullable=True
-    )
-    location: Mapped[str] = mapped_column(String, nullable=True)
+    category: Mapped[JobCategory] = mapped_column(SAEnum(JobCategory), nullable=True)
+    location: Mapped[JobLocation] = mapped_column(SAEnum(JobLocation), nullable=True)
 
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     salary: Mapped[Optional[str]] = mapped_column(String, nullable=True)

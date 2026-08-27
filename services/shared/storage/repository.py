@@ -170,6 +170,27 @@ class NotificationRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def get_pending_stream(
+        self, limit=2000
+    ) -> AsyncGenerator[NotificationORM, None]:
+        stmt = (
+            select(NotificationORM)
+            .where(
+                and_(
+                    NotificationORM.status == "pending",
+                    NotificationORM.next_attempt_at <= datetime.now(timezone.utc),
+                )
+            )
+            .order_by(func.random())
+            .limit(limit)
+            .options(
+                selectinload(NotificationORM.user), selectinload(NotificationORM.job)
+            )
+        )
+        pending_stream = await self.session.stream(stmt)
+        async for notification in pending_stream.scalars():
+            yield notification
+
     async def mark_successful(self, notification: NotificationORM):
         """Mark notification as sent."""
         notification.status = "sent"

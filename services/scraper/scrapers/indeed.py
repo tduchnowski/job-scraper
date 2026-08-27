@@ -3,7 +3,7 @@ from loguru import logger
 from asyncio import Semaphore
 from bs4 import BeautifulSoup
 from services.scraper.scrapers.scraper_base import Scraper
-from services.shared.models.job import Job
+from services.shared.models.job import Job, JobCategory, JobLocation
 from services.shared.config.scraping import INDEED_DOMAINS
 
 
@@ -83,6 +83,8 @@ class IndeedScraper(Scraper):
                 Job(
                     id=str(jk),
                     title=title,
+                    category=JobCategory.UNKNOWN,
+                    location=JobLocation.UNKNOWN,
                     company=company,
                     url=job_url,
                 )

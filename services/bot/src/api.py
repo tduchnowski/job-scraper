@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
 
 from services.bot.src.middleware import UserTrackingMiddleware
-from services.bot.src.consumers.notification import MessageProcessor
+from services.bot.src.consumers.notification import UserMessageProcessor
 from services.bot.src.subscription_service import SubscriptionService
 from services.shared.utils.logger import setup_logger
 from services.shared.infra.redis import create_consumer, create_producer
@@ -34,7 +34,7 @@ def init_bot_and_dispatcher(subscription_service: SubscriptionService):
 def create_app(bot=None, dp=None):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        consumer_task = None
+        user_messages_consumer_task = None
         if bot is None and dp is None:
             setup_logger()
 
@@ -50,22 +50,38 @@ def create_app(bot=None, dp=None):
             subs_service = SubscriptionService(app.state.subscription_producer)
             app.state.bot, app.state.dp = init_bot_and_dispatcher(subs_service)
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
-            message_processor = MessageProcessor(app.state.bot, app.state.dp)
+            # message_processor = MessageProcessor(app.state.bot, app.state.dp)
 
-            # message queue consumer
-            redis_notification_topic = os.getenv("REDIS_NOTIFICATIONS_TOPIC", "")
-            redis_notification_group = os.getenv(
-                "REDIS_TELEGRAM_WORKERS_GROUP_NAME", ""
-            )
-            app.state.notification_consumer = create_consumer(
+            # user notifications consumer - for new jobs
+            # redis_user_notifications_topic = os.getenv("REDIS_USER_NOTIFICATIONS_TOPIC", "")
+            # redis_telegram_group = os.getenv(
+            #     "REDIS_TELEGRAM_WORKERS_GROUP_NAME", ""
+            # )
+            # app.state.user_notifications_consumer = create_consumer(
+            #     redis_host,
+            #     redis_port,
+            #     redis_user_notifications_topic,
+            #     redis_telegram_group,
+            # )
+            # await app.state.user_notifications_consumer.connect()
+            # user_notifications_consumer_task = asyncio.create_task(
+            #     app.state.user_notifications_consumer.consume(message_processor.process)
+            # )
+
+            redis_telegram_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
+
+            # user messages consumer - for ordinary messages, like confirming subscribe or unsubscribe commands
+            message_processor = UserMessageProcessor(app.state.bot, app.state.dp)
+            redis_user_messages_topic = os.getenv("REDIS_USER_MESSAGES_TOPIC", "")
+            app.state.user_messages_consumer = create_consumer(
                 redis_host,
                 redis_port,
-                redis_notification_topic,
-                redis_notification_group,
+                redis_user_messages_topic,
+                redis_telegram_group,
             )
-            await app.state.notification_consumer.connect()
-            consumer_task = asyncio.create_task(
-                app.state.notification_consumer.consume(message_processor.process)
+            await app.state.user_messages_consumer.connect()
+            user_messages_consumer_task = asyncio.create_task(
+                app.state.user_messages_consumer.consume(message_processor.process)
             )
 
             # user update producer
@@ -82,15 +98,6 @@ def create_app(bot=None, dp=None):
             )
             await app.state.subscription_producer.connect()
 
-            # failed notifications producer
-            redis_failed_notifications_topic = os.getenv(
-                "REDIS_FAILED_NOTIFICATIONS_TOPIC", ""
-            )
-            app.state.failed_notifications_producer = create_producer(
-                redis_host, redis_port, redis_failed_notifications_topic
-            )
-            await app.state.failed_notifications_producer.connect()
-
             # add middleware
             app.state.dp.message.middleware(
                 UserTrackingMiddleware(app.state.user_activity_producer)
@@ -98,10 +105,10 @@ def create_app(bot=None, dp=None):
 
         yield
 
-        if consumer_task:
-            consumer_task.cancel()
+        if user_messages_consumer_task:
+            user_messages_consumer_task.cancel()
             try:
-                await consumer_task
+                await user_messages_consumer_task
             except asyncio.CancelledError:
                 pass
 

@@ -3,7 +3,7 @@ from services.shared.models.queue_message import Payload
 from redisaq import Message
 
 
-class MessageProcessor:
+class UserMessageProcessor:
     def __init__(self, bot: Bot, dispatcher: Dispatcher):
         self.bot = bot
         self.dispatcher = dispatcher
