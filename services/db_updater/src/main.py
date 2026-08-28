@@ -12,6 +12,7 @@ from services.db_updater.src.consumer.handlers import (
     NotificationStatusHandler,
 )
 from services.db_updater.src.consumer.worker import worker
+from services.shared.infra.redis import create_producer
 
 
 # TODO: make one function out of the following three, its basically the same thing
@@ -21,9 +22,12 @@ def user_activity_worker(host: str, port: str, workers_group: str):
     return worker(host, port, user_activity_topic, workers_group, handler)
 
 
-def subscription_worker(host: str, port: str, workers_group: str):
+async def subscription_worker(host: str, port: str, workers_group: str):
     subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
-    handler = SubscriptionHandler(get_session_local())
+    user_messages_topic = os.getenv("REDIS_USER_MESSAGES_TOPIC", "")
+    telegram_message_queue_producer = create_producer(host, port, user_messages_topic)
+    await telegram_message_queue_producer.connect()
+    handler = SubscriptionHandler(get_session_local(), telegram_message_queue_producer)
     return worker(host, port, subscription_topic, workers_group, handler)
 
 
@@ -54,13 +58,14 @@ def job_status_worker(host: str, port: str, workers_group: str):
 async def main():
     # create redis consumers
     set_session_local()
-    for key, val in os.environ.items():
-        print(key, val)
     redis_host = os.getenv("REDIS_HOST", "")
     redis_port = os.getenv("REDIS_PORT", "")
     workers_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
+
     workers = [
-        asyncio.create_task(subscription_worker(redis_host, redis_port, workers_group)),
+        asyncio.create_task(
+            await subscription_worker(redis_host, redis_port, workers_group)
+        ),
         asyncio.create_task(
             user_activity_worker(redis_host, redis_port, workers_group)
         ),

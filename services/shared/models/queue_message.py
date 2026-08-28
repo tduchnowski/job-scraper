@@ -32,6 +32,7 @@ class SubscribeOperation(Enum):
 
 class SubscriptionUpdate(BaseModel):
     user_id: int
+    chat_id: int
     operation: SubscribeOperation  # add, remove subscription
     category: str
     location: str

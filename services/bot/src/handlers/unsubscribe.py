@@ -6,7 +6,7 @@ from services.shared.models.queue_message import SubscribeOperation
 
 async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
     """Handle /unsubscribe command."""
-    if not message.text or not message.from_user:
+    if not message.text or not message.from_user or not message.chat:
         return
 
     args_ok, error_msg = are_args_valid(message.text)
@@ -17,7 +17,11 @@ async def unsubscribe_cmd(message: Message, subs_service: SubscriptionService):
     category, location = category.upper(), location.upper()
 
     success = await subs_service.update(
-        message.from_user.id, category, location, SubscribeOperation.REMOVE
+        message.from_user.id,
+        message.chat.id,
+        category,
+        location,
+        SubscribeOperation.REMOVE,
     )
     if not success:
         response_text = "❌ Failed to remove subscription. Please try again later"

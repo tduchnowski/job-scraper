@@ -9,10 +9,19 @@ class SubscriptionService:
         self.subscription_producer = subscription_producer
 
     async def update(
-        self, user_id: int, category: str, location: str, operation: SubscribeOperation
+        self,
+        user_id: int,
+        chat_id: int,
+        category: str,
+        location: str,
+        operation: SubscribeOperation,
     ) -> bool:
         subscription_update = SubscriptionUpdate(
-            user_id=user_id, operation=operation, category=category, location=location
+            user_id=user_id,
+            chat_id=chat_id,
+            operation=operation,
+            category=category,
+            location=location,
         )
         try:
             await self.subscription_producer.enqueue(subscription_update.model_dump())
