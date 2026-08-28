@@ -1,6 +1,5 @@
 from aiogram.types import Message
-
-from jobscraper.config.scraping_config import SEARCH_QUERIES
+from services.shared.config.scraping import SEARCH_QUERIES
 
 
 async def categories_cmd(message: Message):

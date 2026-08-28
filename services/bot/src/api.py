@@ -11,6 +11,7 @@ from aiogram import types, Bot, Dispatcher
 from services.bot.src.middleware import UserTrackingMiddleware
 from services.bot.src.consumers.notification import UserMessageProcessor
 from services.bot.src.subscription_service import SubscriptionService
+from services.shared.storage.session import set_session_local
 from services.shared.utils.logger import setup_logger
 from services.shared.infra.redis import create_consumer, create_producer
 from loguru import logger
@@ -37,6 +38,7 @@ def create_app(bot=None, dp=None):
         user_messages_consumer_task = None
         if bot is None and dp is None:
             setup_logger()
+            set_session_local()
 
             redis_host = os.getenv("REDIS_HOST", "")
             redis_port = os.getenv("REDIS_PORT", "")

@@ -3,9 +3,9 @@ from aiogram.types import Message
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
-from jobscraper.storage.models import UserSubscriptionORM
-from jobscraper.storage.repository import UserSubscriptionRepository
-from jobscraper.storage.session import get_session_local
+from services.shared.storage.models import UserSubscriptionORM
+from services.shared.storage.repository import UserSubscriptionRepository
+from services.shared.storage.session import get_session_local
 
 
 async def mysubscriptions_cmd(message: Message):
