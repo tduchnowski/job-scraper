@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response, status
 from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
+from redisaq import Consumer, Producer
 
 from services.bot.src.middleware import UserTrackingMiddleware
 from services.bot.src.consumers.notification import UserMessageProcessor
@@ -36,6 +37,9 @@ def create_app(bot=None, dp=None):
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         user_messages_consumer_task = None
+        producers: list[Producer] = []  # list of Redis queue producers
+        consumers: list[Consumer] = []  # list of Redis consumers
+        background_tasks: list[asyncio.Task] = []
         if bot is None and dp is None:
             setup_logger()
             set_session_local()
@@ -43,33 +47,15 @@ def create_app(bot=None, dp=None):
             redis_host = os.getenv("REDIS_HOST", "")
             redis_port = os.getenv("REDIS_PORT", "")
 
-            # initialize bot
             subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
                 redis_host, redis_port, subscription_topic
             )
             await app.state.subscription_producer.connect()
+            producers.append(app.state.subscription_producer)
             subs_service = SubscriptionService(app.state.subscription_producer)
             app.state.bot, app.state.dp = init_bot_and_dispatcher(subs_service)
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
-            # message_processor = MessageProcessor(app.state.bot, app.state.dp)
-
-            # user notifications consumer - for new jobs
-            # redis_user_notifications_topic = os.getenv("REDIS_USER_NOTIFICATIONS_TOPIC", "")
-            # redis_telegram_group = os.getenv(
-            #     "REDIS_TELEGRAM_WORKERS_GROUP_NAME", ""
-            # )
-            # app.state.user_notifications_consumer = create_consumer(
-            #     redis_host,
-            #     redis_port,
-            #     redis_user_notifications_topic,
-            #     redis_telegram_group,
-            # )
-            # await app.state.user_notifications_consumer.connect()
-            # user_notifications_consumer_task = asyncio.create_task(
-            #     app.state.user_notifications_consumer.consume(message_processor.process)
-            # )
-
             redis_telegram_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
 
             # user messages consumer - for ordinary messages, like confirming subscribe or unsubscribe commands
@@ -82,9 +68,11 @@ def create_app(bot=None, dp=None):
                 redis_telegram_group,
             )
             await app.state.user_messages_consumer.connect()
+            consumers.append(app.state.user_messages_consumer)
             user_messages_consumer_task = asyncio.create_task(
                 app.state.user_messages_consumer.consume(message_processor.process)
             )
+            background_tasks.append(user_messages_consumer_task)
 
             # user update producer
             redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
@@ -92,6 +80,7 @@ def create_app(bot=None, dp=None):
                 redis_host, redis_port, redis_user_activity_topic
             )
             await app.state.user_activity_producer.connect()
+            producers.append(app.state.user_activity_producer)
 
             # subscription update producer
             redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
@@ -99,6 +88,7 @@ def create_app(bot=None, dp=None):
                 redis_host, redis_port, redis_subscription_topic
             )
             await app.state.subscription_producer.connect()
+            producers.append(app.state.subscription_producer)
 
             # add middleware
             app.state.dp.message.middleware(
@@ -107,19 +97,28 @@ def create_app(bot=None, dp=None):
 
         yield
 
-        if user_messages_consumer_task:
-            user_messages_consumer_task.cancel()
+        for background_task in background_tasks:
+            background_task.cancel()
             try:
-                await user_messages_consumer_task
+                await background_task
             except asyncio.CancelledError:
                 pass
 
-        if app.state.notification_consumer:
-            await app.state.notification_consumer.close()
-        if app.state.user_activity_producer:
-            await app.state.user_activity_producer.close()
-        if app.state.subscription_producer:
-            await app.state.subscription_producer.close()
+        for producer in producers:
+            try:
+                await producer.close()
+            except Exception as e:
+                logger.exception(
+                    f"Failed to close producer for topic: {producer.topic}", e
+                )
+
+        for consumer in consumers:
+            try:
+                await consumer.close()
+            except Exception as e:
+                logger.exception(
+                    f"Failed to close consumer for topic: {consumer.topic}", e
+                )
 
     app = FastAPI(lifespan=lifespan)
 
