@@ -44,12 +44,11 @@ def create_app(bot=None, dp=None):
             setup_logger()
             set_session_local()
 
-            redis_host = os.getenv("REDIS_HOST", "")
-            redis_port = os.getenv("REDIS_PORT", "")
+            redis_url = os.getenv("REDIS_URL", "")
 
             subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
-                redis_host, redis_port, subscription_topic
+                redis_url, subscription_topic
             )
             await app.state.subscription_producer.connect()
             producers.append(app.state.subscription_producer)
@@ -62,8 +61,7 @@ def create_app(bot=None, dp=None):
             message_processor = UserMessageProcessor(app.state.bot, app.state.dp)
             redis_user_messages_topic = os.getenv("REDIS_USER_MESSAGES_TOPIC", "")
             app.state.user_messages_consumer = create_consumer(
-                redis_host,
-                redis_port,
+                redis_url,
                 redis_user_messages_topic,
                 redis_telegram_group,
             )
@@ -77,7 +75,7 @@ def create_app(bot=None, dp=None):
             # user update producer
             redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
             app.state.user_activity_producer = create_producer(
-                redis_host, redis_port, redis_user_activity_topic
+                redis_url, redis_user_activity_topic
             )
             await app.state.user_activity_producer.connect()
             producers.append(app.state.user_activity_producer)
@@ -85,7 +83,7 @@ def create_app(bot=None, dp=None):
             # subscription update producer
             redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
-                redis_host, redis_port, redis_subscription_topic
+                redis_url, redis_subscription_topic
             )
             await app.state.subscription_producer.connect()
             producers.append(app.state.subscription_producer)
