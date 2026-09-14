@@ -2,7 +2,7 @@ import aiohttp
 from loguru import logger
 from asyncio import Semaphore
 from bs4 import BeautifulSoup
-from services.scraper.scrapers.scraper_base import Scraper
+from services.scraper.src.scrapers.scraper_base import Scraper
 from services.shared.models.job import Job, JobCategory, JobLocation
 from services.shared.config.scraping import INDEED_DOMAINS
 

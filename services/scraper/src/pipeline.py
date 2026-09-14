@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from redisaq import Producer
 from datetime import datetime, timezone
 
-from services.scraper.scrapers.indeed import IndeedScraper
-from services.scraper.scrapers.scraper_base import Scraper
+from services.scraper.src.scrapers.indeed import IndeedScraper
+from services.scraper.src.scrapers.scraper_base import Scraper
 from services.shared.config.scraping import SEARCH_QUERIES
 from services.shared.models.job import JobCategory, JobLocation
 from services.shared.storage.models import UserSubscriptionORM

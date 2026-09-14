@@ -27,8 +27,6 @@ from services.shared.storage.models import (
 
 _keep_imports = [JobORM, UserORM, UserSubscriptionORM, NotificationORM]
 
-print("ALEMBIC DEBUG - Registered Tables:", Base.metadata.tables.keys())
-
 # ---
 
 # this is the Alembic Config object, which provides

@@ -12,11 +12,10 @@ async def lifespan(app: FastAPI):
     setup_logger()
     set_session_local()
 
-    redis_host = os.getenv("REDIS_HOST", "")
-    redis_port = os.getenv("REDIS_PORT", "")
+    redis_url = os.getenv("REDIS_URL", "")
     job_topic = os.getenv("REDIS_NEW_JOBS_TOPIC", "")
 
-    app.state.job_producer = create_producer(redis_host, redis_port, job_topic)
+    app.state.job_producer = create_producer(redis_url, job_topic)
     await app.state.job_producer.connect()
 
     yield
@@ -28,10 +27,9 @@ async def lifespan(app: FastAPI):
 def create_app():
     app = FastAPI(lifespan=lifespan)
 
-    # TODO: add api key
     @app.post("/scrape")
     async def scrape(request: Request):
-        sites = ["indeed"]
+        sites = ["indeed"]  # later, should be as a param
         session_maker = get_session_local()
         async with session_maker() as session:
             search_scope = await get_scraping_scope(session)
