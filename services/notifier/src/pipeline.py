@@ -104,7 +104,7 @@ def make_telegram_notification(notification: NotificationORM) -> Payload:
     # return TelegramNotification(chat_id=notification.user.chat_id, notification_id=notification.id, job=notification.job)
     return Payload(
         chat_id=notification.user.chat_id,
-        message=f"New Job\n\nCompany: {notification.job.company}\nTitle: {notification.job.title}\nLocation: {notification.job.location}\nUrl: {notification.job.url}",
+        message=f"New Job\n\nCompany: {notification.job.company}\nTitle: {notification.job.title}\nLocation: {notification.job.location.value}\nUrl: {notification.job.url}",
     )
 
 
