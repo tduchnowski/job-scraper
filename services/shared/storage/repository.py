@@ -175,10 +175,15 @@ class NotificationRepository:
     ) -> AsyncGenerator[NotificationORM, None]:
         stmt = (
             select(NotificationORM)
+            .join(
+                UserSubscriptionORM,
+                NotificationORM.subscription_id == UserSubscriptionORM.id,
+            )
             .where(
                 and_(
                     NotificationORM.status == "pending",
                     NotificationORM.next_attempt_at <= datetime.now(timezone.utc),
+                    UserSubscriptionORM.is_active,
                 )
             )
             .order_by(func.random())
