@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 
-from jobscraper.bot.handlers.errors import error_handler
+from services.bot.src.handlers.errors import error_handler
 
 
 @pytest.mark.asyncio
