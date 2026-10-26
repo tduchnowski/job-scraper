@@ -57,8 +57,15 @@ def create_app(bot=None, dp=None):
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
             redis_telegram_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
 
-            # user messages consumer - for ordinary messages, like confirming subscribe or unsubscribe commands
-            message_processor = UserMessageProcessor(app.state.bot, app.state.dp)
+            notification_status_topic = os.getenv("REDIS_NOTIFICATION_STATUS_TOPIC", "")
+            print("noti topic", notification_status_topic)
+            app.state.notification_status_producer = create_producer(
+                redis_url, notification_status_topic
+            )
+            await app.state.notification_status_producer.connect()
+            message_processor = UserMessageProcessor(
+                app.state.bot, app.state.notification_status_producer
+            )
             redis_user_messages_topic = os.getenv("REDIS_USER_MESSAGES_TOPIC", "")
             app.state.user_messages_consumer = create_consumer(
                 redis_url,

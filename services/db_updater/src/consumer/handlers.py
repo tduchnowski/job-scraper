@@ -23,7 +23,7 @@ from services.shared.models.queue_message import (
     NewJob,
     NewNotification,
     NotificationUpdate,
-    Payload,
+    TelegramUserMessage,
     SubscriptionUpdate,
     UserActivity,
     SubscribeOperation,
@@ -103,9 +103,9 @@ class SubscriptionHandler(ConsumerHandler):
             ack_message = "Something went wrong. Try again later"
 
         await self.telegram_message_queue.enqueue(
-            Payload(chat_id=subscription.chat_id, message=ack_message).model_dump(
-                mode="json"
-            )
+            TelegramUserMessage(
+                chat_id=subscription.chat_id, message=ack_message
+            ).model_dump(mode="json")
         )
 
     def _make_ack_message(
@@ -141,14 +141,15 @@ class SubscriptionHandler(ConsumerHandler):
 class NotificationStatusHandler(ConsumerHandler):
     async def process(self, message: Message):
         notification_status = NotificationUpdate.model_validate(message.payload)
-        async with self.session_maker() as session:
-            # TODO: add exception handling
-            notification_orm = NotificationORM(
-                id=notification_status.notification_id,
-                status=notification_status.status,
-            )
-            await session.merge(notification_orm)
-            await session.commit()
+        print(notification_status)
+        # async with self.session_maker() as session:
+        #     pass
+        # notification_orm = NotificationORM(
+        #     id=notification_status.notification_id,
+        #     status=notification_status.status,
+        # )
+        # await session.merge(notification_orm)
+        # await session.commit()
 
 
 class NewNotificationHandler(ConsumerHandler):

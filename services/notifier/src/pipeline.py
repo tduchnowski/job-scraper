@@ -6,7 +6,7 @@ from redisaq import Producer
 from sqlalchemy.ext.asyncio import AsyncSession
 from services.notifier.src.notifications_generator import NotificationsGenerator
 from services.shared.models.job import JobStatus
-from services.shared.models.queue_message import JobUpdate, Payload
+from services.shared.models.queue_message import JobUpdate, TelegramUserMessage
 from services.shared.storage.models import NotificationORM
 from services.shared.storage.repository import JobRepository, NotificationRepository
 
@@ -100,10 +100,11 @@ async def make_messages(
     return result
 
 
-def make_telegram_notification(notification: NotificationORM) -> Payload:
-    return Payload(
+def make_telegram_notification(notification: NotificationORM) -> TelegramUserMessage:
+    return TelegramUserMessage(
         chat_id=notification.user.chat_id,
         message=f"New Job\n\nCompany: {notification.job.company}\nTitle: {notification.job.title}\nLocation: {notification.job.location.value}\nUrl: {notification.job.url}",
+        notification_ids=[notification.id],
     )
 
 

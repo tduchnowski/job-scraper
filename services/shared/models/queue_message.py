@@ -1,21 +1,17 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 from pydantic import BaseModel, Field
 from datetime import UTC, datetime
 
-from services.shared.storage.models import NotificationStatus
 from services.shared.models.job import JobCategory, JobStatus
 
 
-class Payload(BaseModel):
+class TelegramUserMessage(BaseModel):
     chat_id: int
     message: str
-
-
-# class TelegramNotification(BaseModel):
-#     chat_id: int
-#     notification_id: int
-#     job: Job
+    notification_ids: list[int] | None = (
+        None  # in case the message is a job notification
+    )
 
 
 class UserActivity(BaseModel):
@@ -38,9 +34,15 @@ class SubscriptionUpdate(BaseModel):
     location: str
 
 
+class NotificationStatus(IntEnum):
+    SUCCESS = 0
+    FAIL = 1
+    PERMANENT_FAIL = 2
+
+
 class NotificationUpdate(BaseModel):
     notification_id: int
-    status: NotificationStatus
+    status: NotificationStatus  # was notification delivered successfully or not
 
 
 class NewNotification(BaseModel):
