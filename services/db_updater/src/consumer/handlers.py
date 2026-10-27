@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from loguru import logger
 from pydantic import ValidationError
 from redisaq import Message, Producer
-from sqlalchemy import select
+from sqlalchemy import func, select, update, case
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from services.shared.storage.models import (
@@ -11,6 +12,7 @@ from services.shared.storage.models import (
     UserORM,
     UserSubscriptionORM,
 )
+from services.shared.models.queue_message import NotificationStatus
 
 # from services.db_updater.src.storage.models import (
 #     JobORM,
@@ -140,16 +142,72 @@ class SubscriptionHandler(ConsumerHandler):
 
 class NotificationStatusHandler(ConsumerHandler):
     async def process(self, message: Message):
-        notification_status = NotificationUpdate.model_validate(message.payload)
-        print(notification_status)
-        # async with self.session_maker() as session:
-        #     pass
-        # notification_orm = NotificationORM(
-        #     id=notification_status.notification_id,
-        #     status=notification_status.status,
-        # )
-        # await session.merge(notification_orm)
-        # await session.commit()
+        try:
+            notification_update = NotificationUpdate.model_validate(message.payload)
+        except ValidationError as e:
+            logger.exception(
+                "Notification status validation failed. Dropping",
+                extra={
+                    "raw_payload": getattr(message, "payload", None),
+                    "redis_msg_id": message.msg_id,
+                    "errors": e.errors(),
+                },
+            )
+            return
+        try:
+            async with self.session_maker() as session:
+                async with session.begin():
+                    await self.update_notification(session, notification_update)
+        except SQLAlchemyError:
+            logger.exception(
+                "Notification status update failed",
+                extra={
+                    "raw_payload": getattr(message, "payload", None),
+                    "redis_msg_id": message.msg_id,
+                },
+            )
+
+    async def update_notification(
+        self, session: AsyncSession, notification_update: NotificationUpdate
+    ):
+        n_id = notification_update.notification_id
+        n_status = notification_update.status
+        time_now = datetime.now(timezone.utc)
+        # TODO: this should probably be in NotificationRepository
+        match n_status:
+            case NotificationStatus.SUCCESS:
+                stmt = (
+                    update(NotificationORM)
+                    .where(NotificationORM.id == n_id)
+                    .values(status="delivered", last_attempt_at=time_now)
+                )
+            case NotificationStatus.FAIL:
+                incremented_attempts = NotificationORM.attempts + 1
+                max_trials = 3  # TODO: shouldn't have hardcoded values. make a constant somewhere
+                next_status = case(
+                    (incremented_attempts >= max_trials, "failed"), else_="pending"
+                )
+                backoff_s = 60
+                backoff_interval = func.make_interval(
+                    secs=backoff_s * func.power(2, NotificationORM.attempts)
+                )
+                stmt = (
+                    update(NotificationORM)
+                    .where(NotificationORM.id == n_id)
+                    .values(
+                        attempts=incremented_attempts,
+                        status=next_status,
+                        last_attempt=time_now,
+                        next_attempt_at=time_now + backoff_interval,
+                    )
+                )
+            case NotificationStatus.PERMANENT_FAIL:
+                stmt = (
+                    update(NotificationORM)
+                    .where(NotificationORM.id == n_id)
+                    .values(status="failed", last_attempt_at=time_now)
+                )
+        await session.execute(stmt)
 
 
 class NewNotificationHandler(ConsumerHandler):
