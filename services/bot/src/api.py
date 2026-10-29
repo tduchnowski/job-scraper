@@ -1,12 +1,13 @@
 import os
 import asyncio
+import json
 
 from typing import Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response, status
-from fastapi.responses import JSONResponse
 from aiogram import types, Bot, Dispatcher
+from pydantic import ValidationError
 from redisaq import Consumer, Producer
 
 from services.bot.src.middleware import UserTrackingMiddleware
@@ -46,26 +47,33 @@ def create_app(bot=None, dp=None):
 
             redis_url = os.getenv("REDIS_URL", "")
 
+            # producer - user subscriptions
             subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
                 redis_url, subscription_topic
             )
             await app.state.subscription_producer.connect()
             producers.append(app.state.subscription_producer)
+
             subs_service = SubscriptionService(app.state.subscription_producer)
             app.state.bot, app.state.dp = init_bot_and_dispatcher(subs_service)
+
             app.state.webhook_token = os.getenv("TELEGRAM_WEBHOOK_TOKEN")
             redis_telegram_group = os.getenv("REDIS_TELEGRAM_WORKERS_GROUP_NAME", "")
 
+            # producer - notification updates queue
             notification_status_topic = os.getenv("REDIS_NOTIFICATION_STATUS_TOPIC", "")
-            print("noti topic", notification_status_topic)
             app.state.notification_status_producer = create_producer(
                 redis_url, notification_status_topic
             )
             await app.state.notification_status_producer.connect()
+            producers.append(app.state.notification_status_producer)
+
             message_processor = UserMessageProcessor(
                 app.state.bot, app.state.notification_status_producer
             )
+
+            # consumer - messages for users
             redis_user_messages_topic = os.getenv("REDIS_USER_MESSAGES_TOPIC", "")
             app.state.user_messages_consumer = create_consumer(
                 redis_url,
@@ -74,12 +82,13 @@ def create_app(bot=None, dp=None):
             )
             await app.state.user_messages_consumer.connect()
             consumers.append(app.state.user_messages_consumer)
+
             user_messages_consumer_task = asyncio.create_task(
                 app.state.user_messages_consumer.consume(message_processor.process)
             )
             background_tasks.append(user_messages_consumer_task)
 
-            # user update producer
+            # producer - user updates
             redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
             app.state.user_activity_producer = create_producer(
                 redis_url, redis_user_activity_topic
@@ -87,7 +96,7 @@ def create_app(bot=None, dp=None):
             await app.state.user_activity_producer.connect()
             producers.append(app.state.user_activity_producer)
 
-            # subscription update producer
+            # producer - subscription update
             redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
             app.state.subscription_producer = create_producer(
                 redis_url, redis_subscription_topic
@@ -112,32 +121,20 @@ def create_app(bot=None, dp=None):
         for producer in producers:
             try:
                 await producer.close()
-            except Exception as e:
+            except Exception:
                 logger.exception(
-                    f"Failed to close producer for topic: {producer.topic}", e
+                    "Failed to close a producer", extra={"topic": producer.topic}
                 )
 
         for consumer in consumers:
             try:
                 await consumer.close()
-            except Exception as e:
+            except Exception:
                 logger.exception(
-                    f"Failed to close consumer for topic: {consumer.topic}", e
+                    "Failed to close a consumer", extra={"topic": consumer.topic}
                 )
 
     app = FastAPI(lifespan=lifespan)
-
-    @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        if isinstance(exc, HTTPException):
-            raise exc
-
-        logger.exception(f"Unhandled error: {exc}")
-
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error"},
-        )
 
     @app.get("/health")
     async def health():
@@ -158,16 +155,34 @@ def create_app(bot=None, dp=None):
     )
     async def webhook(request: Request):
         """Handle Telegram webhook updates."""
+        update = None
         try:
             # parse update
             update_data = await request.json()
             update = types.Update(**update_data)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            logger.warning("Received non-JSON structure as an update")
+        except ValidationError as e:
+            logger.exception(
+                "Telegram Update payload failed schema validation",
+                extra={"validation_errors": e.errors(), "raw_payload": update},
+            )
+        except (TypeError, ValueError) as e:
+            logger.warning(
+                "Received invalid JSON structure", extra={"error_detail": str(e)}
+            )
 
+        if update is None:
+            return Response(status_code=200)
+
+        try:
             # feed to dispatcher
             await app.state.dp.feed_update(app.state.bot, update)
-
-        except Exception as e:
-            logger.exception(f"Webhook error: {e}")
+        except Exception:
+            logger.exception(
+                "Unexpected webhook error",
+                extra={"telegram_update": update.model_dump()},
+            )
 
         return Response(status_code=200)  # always return 200, unless unauthorized
 
