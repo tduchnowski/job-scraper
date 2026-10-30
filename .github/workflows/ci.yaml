@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.13"
           cache: "poetry"
-      - run: poetry install --without test --no-interaction
+      - run: poetry install --no-interaction
       - run: poetry run mypy .
 
 
