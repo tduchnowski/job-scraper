@@ -1,0 +1,49 @@
+jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+      - run: poetry install --only dev --no-interaction
+      - run: poetry run ruff check .
+      - run: poetry run ruff format --check .
+
+  type-check:
+    name: Type Check (Mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+      - run: poetry install --without test --no-interaction
+      - run: poetry run mypy .
+
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: poetry install --without dev --no-interaction
+
+      - name: Run tests
+        run: poetry run pytest --maxfail=1 --disable-warnings -v
