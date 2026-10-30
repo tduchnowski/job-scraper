@@ -12,8 +12,7 @@ async def mysubscriptions_cmd(message: Message):
     if not message.from_user:
         return
     user_id = message.from_user.id
-    # get subscriptions from db
-    subscriptions = []
+    subscriptions: Sequence[UserSubscriptionORM] = []
     try:
         async with get_session_local()() as session:
             repo = UserSubscriptionRepository(session)

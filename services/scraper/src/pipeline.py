@@ -73,7 +73,7 @@ async def scrape_from_site(
         for location, categories in search_scope.items():
             scraper = scraper_class(session, sem, location)
             tasks.append(scrape_domain(scraper, job_queue, categories))
-        domain_results = await asyncio.gather(*tasks, return_exceptions=True)
+        domain_results = await asyncio.gather(*tasks)
     domain_results = filter_results(domain_results)
     result.domain_results = domain_results
     result.ok = True
@@ -87,19 +87,49 @@ async def scrape_domain(
     res = ScrapeDomainResult()
     res.location = scraper.location
     jobs_found_counter = 0
+    abort = False
     for category in categories:
+        if abort:  # check if there was any heavy error in the inner loop
+            break
         for query in SEARCH_QUERIES[category]:
-            jobs = await scraper.scrape_job_list(query)
-            for job in jobs:
-                job.category = JobCategory[category]
-                job.location = JobLocation[scraper.location]
-                job.scraped_at = datetime.now(timezone.utc)
-            serialized_jobs = [job.model_dump(mode="json") for job in jobs]
-            await queue.batch_enqueue(serialized_jobs)
-            jobs_found_counter += len(serialized_jobs)
-            await asyncio.sleep(random.uniform(wait_min, wait_max))
+            try:
+                jobs = await scraper.scrape_job_list(query)
+                for job in jobs:
+                    job.category = JobCategory[category]
+                    job.location = JobLocation[scraper.location]
+                    job.scraped_at = datetime.now(timezone.utc)
+                serialized_jobs = [job.model_dump(mode="json") for job in jobs]
+                await queue.batch_enqueue(serialized_jobs)
+                jobs_found_counter += len(serialized_jobs)
+            except (ConnectionRefusedError, PermissionError) as e:
+                logger.exception(
+                    "Aborting scraping due to refused connection or permission error",
+                    extra={
+                        "scraper": scraper.__class__.__name__,
+                        "query": query,
+                        "location": scraper.location,
+                        "category": category,
+                        "error": str(e),
+                    },
+                )
+                res.error = f"{e}"
+                abort = True
+                break
+            except Exception as e:
+                logger.warning(
+                    "Failed to scrape query. Skipping",
+                    extra={
+                        "scraper": scraper.__class__.__name__,
+                        "query": query,
+                        "location": scraper.location,
+                        "category": category,
+                        "error": str(e),
+                    },
+                )
+            finally:
+                await asyncio.sleep(random.uniform(wait_min, wait_max))
 
-    res.ok = True
+    res.ok = not abort
     res.total_jobs_found = jobs_found_counter
     res.scraping_duration_seconds = time.perf_counter() - start_t
     return res

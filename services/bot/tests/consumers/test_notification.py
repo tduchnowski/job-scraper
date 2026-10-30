@@ -11,11 +11,9 @@ def user_msg_processor() -> UserMessageProcessor:
     """
     Provides a UserMessageProcessor with fully mocked async dependencies.
     """
-    # Create the AsyncMocks for the external dependencies
     mock_bot = AsyncMock()
     mock_producer = AsyncMock()
 
-    # Inject the mocks into your processor
     processor = UserMessageProcessor(
         bot=mock_bot, notification_status_producer=mock_producer
     )
@@ -95,6 +93,6 @@ async def test_process_bot_general_exception(user_msg_processor):
 
 @pytest.mark.asyncio
 async def test_process_user_blocked_exception(user_msg_processor):
-    """test if notifications are permanently failed for blocked users"""
+    """test if notifications are marked as permanently failed for blocked users"""
     # TODO
     pass

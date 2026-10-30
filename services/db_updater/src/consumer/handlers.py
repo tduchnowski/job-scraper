@@ -13,13 +13,6 @@ from services.shared.storage.models import (
     UserSubscriptionORM,
 )
 from services.shared.models.queue_message import NotificationStatus
-
-# from services.db_updater.src.storage.models import (
-#     JobORM,
-#     NotificationORM,
-#     UserORM,
-#     UserSubscriptionORM,
-# )
 from services.shared.models.queue_message import (
     JobUpdate,
     NewJob,

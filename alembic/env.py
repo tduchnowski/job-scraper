@@ -9,7 +9,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from jobscraper.config.env import setup_env
+# from jobscraper.config.env import setup_env
 from services.shared.config.env import setup_env
 
 # -- my additions

@@ -13,7 +13,7 @@ class UserTrackingCache:
 class UserTrackingMiddleware(BaseMiddleware):
     def __init__(self, queue_producer: Producer):
         self.queue_producer = queue_producer
-        self.cache = {}  # user_id -> time
+        self.cache: dict[int, datetime] = {}  # user_id -> time
 
     async def __call__(self, handler, event, data):
         user = data.get("event_from_user")

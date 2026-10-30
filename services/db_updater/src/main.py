@@ -1,8 +1,7 @@
 import os
 import asyncio
 
-
-from services.db_updater.src.storage.session import get_session_local, set_session_local
+from services.shared.storage.session import get_session_local, set_session_local
 from services.db_updater.src.consumer.handlers import (
     JobStatusHandler,
     NewJobHandler,

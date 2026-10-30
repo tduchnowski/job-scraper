@@ -15,9 +15,6 @@ class IndeedScraper(Scraper):
         domain = INDEED_DOMAINS.get(location, "https://indeed.com")
         self._base_url = f"{domain}/jobs"
         self._jobview_url = f"{domain}/viewjob"
-        # self._session = http_session
-        # self.location = location
-        # self.sem = sem
 
     async def scrape_job_list(self, query: str) -> list[Job]:
         logger.debug(f"Scraping Indeed, query={query}, location={self.location}")
@@ -57,10 +54,10 @@ class IndeedScraper(Scraper):
         job_ids = set()
 
         for job in jobs:
-            title = job.find("h3", {"class": "jobTitle"})
-            title = title.get_text(strip=True) if title else None
-            company = job.find("span", {"data-testid": "company-name"})
-            company = company.get_text(strip=True) if company else None
+            title_tag = job.find("h3", {"class": "jobTitle"})
+            title = title_tag.get_text(strip=True) if title_tag else None
+            company_tag = job.find("span", {"data-testid": "company-name"})
+            company = company_tag.get_text(strip=True) if company_tag else None
             if not title or not company:
                 logger.warning("Missing title or company, skipping")
                 continue

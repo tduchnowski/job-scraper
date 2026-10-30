@@ -76,7 +76,7 @@ async def make_messages(
     result = DispatchResult()
     repo = NotificationRepository(session)
     batch = []
-    counter = defaultdict(int)
+    counter: dict[int, int] = defaultdict(int)
     start_t = time.perf_counter()
     async for notification in repo.get_pending_stream():
         user_id = notification.user_id

@@ -13,7 +13,6 @@ from services.shared.storage.models import (
     UserORM,
     UserSubscriptionORM,
 )
-# from jobscraper.storage.mappers import job_to_orm
 
 
 class UpsertResult(Enum):
