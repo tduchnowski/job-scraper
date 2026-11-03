@@ -1,0 +1,60 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-east4
+  REPO_NAME: it-jobs-worldwide-artifacts
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Microservices
+        run: |
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}"
+          TAG=$(git rev-parse --short HEAD)
+
+          # updater service
+          docker build -t $REGISTRY/db_updater:$TAG -t $REGISTRY/db_updater:latest -f ./services/db_updater/Dockerfile .
+          docker push $REGISTRY/db_updater:$TAG
+          docker push $REGISTRY/db_updater:latest
+
+          # bot service
+          docker build -t $REGISTRY/bot:$TAG -t $REGISTRY/bot:latest -f ./services/bot/Dockerfile .
+          docker push $REGISTRY/bot:$TAG
+          docker push $REGISTRY/bot:latest
+
+          # scraper service
+          docker build -t $REGISTRY/scraper:$TAG -t $REGISTRY/scraper:latest -f ./services/scraper/Dockerfile .
+          docker push $REGISTRY/scraper:$TAG
+          docker push $REGISTRY/scraper:latest
+
+          # notifier service
+          docker build -t $REGISTRY/notifier:$TAG -t $REGISTRY/notifier:latest -f ./services/notifier/Dockerfile .
+          docker push $REGISTRY/notifier:$TAG
+          docker push $REGISTRY/notifier:latest

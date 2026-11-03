@@ -39,4 +39,4 @@ htmlcov/
 .ipynb_checkpoints/
 *.bak
 *.tmp
-
+.secrets
