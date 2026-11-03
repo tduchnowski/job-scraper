@@ -11,8 +11,10 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: us-east4
+  REGISTRY_REGION: us-east4
   REPO_NAME: it-jobs-worldwide-artifacts
+  NOTIFIER_REGION: europe-west1
+  SCRAPER_REGION: europe-north1
 
 jobs:
   build-and-push:
@@ -32,11 +34,11 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker ${{ env.REGISTRY_REGION }}-docker.pkg.dev --quiet
 
       - name: Build and Push Microservices
         run: |
-          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}"
+          REGISTRY="${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}"
           TAG=$(git rev-parse --short HEAD)
 
           # updater service
@@ -58,3 +60,18 @@ jobs:
           docker build -t $REGISTRY/notifier:$TAG -t $REGISTRY/notifier:latest -f ./services/notifier/Dockerfile .
           docker push $REGISTRY/notifier:$TAG
           docker push $REGISTRY/notifier:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          REGISTRY="${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}"
+          TAG=$(git rev-parse --short HEAD)
+          
+          gcloud run deploy scraper \
+            --image $REGISTRY/scraper:$TAG \
+            --region ${{ env.SCRAPER_REGION }} \
+            --quiet
+
+          gcloud run deploy notifier \
+            --image $REGISTRY/notifier:$TAG \
+            --region ${{ env.NOTIFIER_REGION }} \
+            --quiet
