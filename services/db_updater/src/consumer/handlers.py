@@ -1,27 +1,29 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+
 from loguru import logger
 from pydantic import ValidationError
 from redisaq import Message, Producer
-from sqlalchemy import func, select, update, case
+from sqlalchemy import case, func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from services.shared.models.queue_message import (
+    JobUpdate,
+    NewJob,
+    NewNotification,
+    NotificationStatus,
+    NotificationUpdate,
+    SubscribeOperation,
+    SubscriptionUpdate,
+    TelegramUserMessage,
+    UserActivity,
+)
 from services.shared.storage.models import (
     JobORM,
     NotificationORM,
     UserORM,
     UserSubscriptionORM,
-)
-from services.shared.models.queue_message import NotificationStatus
-from services.shared.models.queue_message import (
-    JobUpdate,
-    NewJob,
-    NewNotification,
-    NotificationUpdate,
-    TelegramUserMessage,
-    SubscriptionUpdate,
-    UserActivity,
-    SubscribeOperation,
 )
 
 
@@ -182,7 +184,13 @@ class NotificationStatusHandler(ConsumerHandler):
                 )
                 backoff_s = 60
                 backoff_interval = func.make_interval(
-                    secs=backoff_s * func.power(2, NotificationORM.attempts)
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    backoff_s * func.power(2, NotificationORM.attempts),
                 )
                 stmt = (
                     update(NotificationORM)
@@ -190,7 +198,7 @@ class NotificationStatusHandler(ConsumerHandler):
                     .values(
                         attempts=incremented_attempts,
                         status=next_status,
-                        last_attempt=time_now,
+                        last_attempt_at=time_now,
                         next_attempt_at=time_now + backoff_interval,
                     )
                 )
