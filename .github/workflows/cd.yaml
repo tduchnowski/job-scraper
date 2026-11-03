@@ -36,20 +36,28 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGISTRY_REGION }}-docker.pkg.dev --quiet
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and Push Microservices
         run: |
           REGISTRY="${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}"
           TAG=$(git rev-parse --short HEAD)
 
-          # updater service
-          docker build -t $REGISTRY/db_updater:$TAG -t $REGISTRY/db_updater:latest -f ./services/db_updater/Dockerfile .
-          docker push $REGISTRY/db_updater:$TAG
-          docker push $REGISTRY/db_updater:latest
+          # bot service (ARM)
+          docker buildx build --platform linux/arm64 \
+            -t $REGISTRY/bot:$TAG \
+            -t $REGISTRY/bot:latest \
+            --push -f ./services/bot/Dockerfile .
 
-          # bot service
-          docker build -t $REGISTRY/bot:$TAG -t $REGISTRY/bot:latest -f ./services/bot/Dockerfile .
-          docker push $REGISTRY/bot:$TAG
-          docker push $REGISTRY/bot:latest
+          # updater service (ARM)
+          docker buildx build --platform linux/arm64 \
+            -t $REGISTRY/db_updater:$TAG \
+            -t $REGISTRY/db_updater:latest \
+            --push -f ./services/db_updater/Dockerfile .
 
           # scraper service
           docker build -t $REGISTRY/scraper:$TAG -t $REGISTRY/scraper:latest -f ./services/scraper/Dockerfile .
