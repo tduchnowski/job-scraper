@@ -1,7 +1,7 @@
+from datetime import UTC, datetime
 from enum import Enum, IntEnum
 
 from pydantic import BaseModel, Field
-from datetime import UTC, datetime
 
 from services.shared.models.job import JobCategory, JobStatus
 
@@ -9,15 +9,14 @@ from services.shared.models.job import JobCategory, JobStatus
 class TelegramUserMessage(BaseModel):
     chat_id: int
     message: str
-    notification_ids: list[int] | None = (
-        None  # in case the message is a job notification
-    )
+    notification_ids: list[int] | None = None
 
 
 class UserActivity(BaseModel):
     user_id: int
     chat_id: int
     username: str
+    is_active: bool = True  # can be false in case bot is blocked
     activity_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

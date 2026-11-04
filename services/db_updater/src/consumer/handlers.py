@@ -43,6 +43,7 @@ class UserActivityHandler(ConsumerHandler):
             user = UserORM(
                 id=user_activity.user_id,
                 chat_id=user_activity.chat_id,
+                is_active=user_activity.is_active,
                 last_interaction=user_activity.activity_time,
             )
             await session.merge(user)
@@ -58,8 +59,11 @@ class SubscriptionHandler(ConsumerHandler):
         ack_message = ""
         try:
             subscription = SubscriptionUpdate.model_validate(message.payload)
-        except ValidationError as e:
-            logger.error(f"Inbound message failed schema validation: {e.json()}")
+        except ValidationError:
+            logger.error(
+                "Inbound message failed schema validation",
+                extra={"payload": message.payload},
+            )
             return
         except Exception as e:
             logger.exception(e)
@@ -67,34 +71,29 @@ class SubscriptionHandler(ConsumerHandler):
 
         try:
             async with self.session_maker() as session:
-                try:
-                    stmt = select(UserSubscriptionORM).where(
-                        UserSubscriptionORM.user_id == subscription.user_id,
-                        UserSubscriptionORM.category == subscription.category,
-                        UserSubscriptionORM.location == subscription.location,
+                stmt = select(UserSubscriptionORM).where(
+                    UserSubscriptionORM.user_id == subscription.user_id,
+                    UserSubscriptionORM.category == subscription.category,
+                    UserSubscriptionORM.location == subscription.location,
+                )
+                subscription_orm = (await session.execute(stmt)).scalar_one_or_none()
+                ack_message = self._make_ack_message(subscription, subscription_orm)
+                if (
+                    subscription_orm is None
+                    and subscription.operation == SubscribeOperation.ADD
+                ):
+                    subscription_orm = UserSubscriptionORM(
+                        user_id=subscription.user_id,
+                        category=subscription.category,
+                        location=subscription.location,
                     )
-                    subscription_orm = (
-                        await session.execute(stmt)
-                    ).scalar_one_or_none()
-                    ack_message = self._make_ack_message(subscription, subscription_orm)
-                    if (
-                        subscription_orm is None
-                        and subscription.operation == SubscribeOperation.ADD
-                    ):
-                        subscription_orm = UserSubscriptionORM(
-                            user_id=subscription.user_id,
-                            category=subscription.category,
-                            location=subscription.location,
-                        )
-                    elif subscription_orm is not None:
-                        if subscription.operation == SubscribeOperation.REMOVE:
-                            subscription_orm.is_active = False
-                        elif subscription.operation == SubscribeOperation.ADD:
-                            subscription_orm.is_active = True
-                    await session.merge(subscription_orm)
-                    await session.commit()
-                except SQLAlchemyError:
-                    raise
+                elif subscription_orm is not None:
+                    if subscription.operation == SubscribeOperation.REMOVE:
+                        subscription_orm.is_active = False
+                    elif subscription.operation == SubscribeOperation.ADD:
+                        subscription_orm.is_active = True
+                await session.merge(subscription_orm)
+                await session.commit()
         except (SQLAlchemyError, Exception) as e:
             logger.exception("Subscription update failure", e)
             ack_message = "Something went wrong. Try again later"
