@@ -1,7 +1,8 @@
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
 from redisaq import Message
+
 from services.bot.src.consumers.notification import UserMessageProcessor
 from services.shared.models.queue_message import NotificationStatus
 
@@ -51,7 +52,12 @@ async def test_emit_notification_update_correct_batch(user_msg_processor):
 async def test_process_valid_message(user_msg_processor):
     chat_id = 1
     text = "job1, job2"
-    payload = {"chat_id": chat_id, "message": text, "notification_ids": [1, 2]}
+    payload = {
+        "user_id": 1,
+        "chat_id": chat_id,
+        "message": text,
+        "notification_ids": [1, 2],
+    }
     msg = Message(topic="smth", payload=payload)
     await user_msg_processor.process(msg)
     expected_batch = [
@@ -78,7 +84,12 @@ async def test_process_invalid_message(user_msg_processor):
 async def test_process_bot_general_exception(user_msg_processor):
     chat_id = 1
     text = "job1, job2"
-    payload = {"chat_id": chat_id, "message": text, "notification_ids": [1, 2]}
+    payload = {
+        "user_id": 1,
+        "chat_id": chat_id,
+        "message": text,
+        "notification_ids": [1, 2],
+    }
     msg = Message(topic="smth", payload=payload)
     user_msg_processor.bot.send_message.side_effect = Exception()
     await user_msg_processor.process(msg)
