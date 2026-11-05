@@ -106,6 +106,7 @@ def make_telegram_notification(notification: NotificationORM) -> TelegramUserMes
     return TelegramUserMessage(
         user_id=notification.user_id,
         chat_id=notification.user.chat_id,
+        username=notification.user.username,
         message=f"New Job\n\nCompany: {notification.job.company}\nTitle: {notification.job.title}\nLocation: {notification.job.location.value}\nUrl: {notification.job.url}",
         notification_ids=[notification.id],
     )
