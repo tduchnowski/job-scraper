@@ -1,13 +1,9 @@
 from datetime import datetime, timedelta
+
 from aiogram import BaseMiddleware
 from redisaq import Producer
 
 from services.shared.models.queue_message import UserActivity
-
-
-# TODO: implement a cache that has a limit for entries
-class UserTrackingCache:
-    pass
 
 
 class UserTrackingMiddleware(BaseMiddleware):

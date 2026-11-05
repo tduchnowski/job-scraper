@@ -1,6 +1,8 @@
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
+from aiogram.exceptions import TelegramForbiddenError
+from aiogram.methods import SendMessage
 from redisaq import Message
 
 from services.bot.src.consumers.notification import UserMessageProcessor
@@ -13,10 +15,13 @@ def user_msg_processor() -> UserMessageProcessor:
     Provides a UserMessageProcessor with fully mocked async dependencies.
     """
     mock_bot = AsyncMock()
-    mock_producer = AsyncMock()
+    mock_notification_producer = AsyncMock()
+    mock_user_activity_producer = AsyncMock()
 
     processor = UserMessageProcessor(
-        bot=mock_bot, notification_status_producer=mock_producer
+        bot=mock_bot,
+        notification_status_producer=mock_notification_producer,
+        user_activity_producer=mock_user_activity_producer,
     )
 
     return processor
@@ -82,12 +87,10 @@ async def test_process_invalid_message(user_msg_processor):
 
 @pytest.mark.asyncio
 async def test_process_bot_general_exception(user_msg_processor):
-    chat_id = 1
-    text = "job1, job2"
     payload = {
         "user_id": 1,
-        "chat_id": chat_id,
-        "message": text,
+        "chat_id": 1,
+        "message": "job1, job2",
         "notification_ids": [1, 2],
     }
     msg = Message(topic="smth", payload=payload)
@@ -104,6 +107,25 @@ async def test_process_bot_general_exception(user_msg_processor):
 
 @pytest.mark.asyncio
 async def test_process_user_blocked_exception(user_msg_processor):
-    """test if notifications are marked as permanently failed for blocked users"""
-    # TODO
-    pass
+    """test user activity is pushed to redis with is_active set to False"""
+    payload = {
+        "user_id": 1,
+        "chat_id": 1,
+        "message": "job1, job2",
+        "notification_ids": [1, 2],
+    }
+    msg = Message(topic="smth", payload=payload)
+    user_msg_processor.bot.send_message.side_effect = TelegramForbiddenError(
+        method=SendMessage(chat_id=1, text="job1, job2"), message="Bot blocked"
+    )
+    await user_msg_processor.process(msg)
+    expected_user_activity = {
+        "user_id": payload["user_id"],
+        "chat_id": payload["chat_id"],
+        "username": None,
+        "is_active": False,
+        "activity_time": ANY,
+    }
+    user_msg_processor.user_activity_producer.enqueue.assert_called_with(
+        expected_user_activity
+    )

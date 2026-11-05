@@ -1,9 +1,11 @@
+import time
 from collections import defaultdict
 from dataclasses import dataclass
-import time
 from typing import Optional
+
 from redisaq import Producer
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from services.notifier.src.notifications_generator import NotificationsGenerator
 from services.shared.models.job import JobStatus
 from services.shared.models.queue_message import JobUpdate, TelegramUserMessage
@@ -102,6 +104,7 @@ async def make_messages(
 
 def make_telegram_notification(notification: NotificationORM) -> TelegramUserMessage:
     return TelegramUserMessage(
+        user_id=notification.user_id,
         chat_id=notification.user.chat_id,
         message=f"New Job\n\nCompany: {notification.job.company}\nTitle: {notification.job.title}\nLocation: {notification.job.location.value}\nUrl: {notification.job.url}",
         notification_ids=[notification.id],

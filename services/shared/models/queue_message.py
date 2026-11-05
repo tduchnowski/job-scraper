@@ -7,7 +7,9 @@ from services.shared.models.job import JobCategory, JobStatus
 
 
 class TelegramUserMessage(BaseModel):
+    user_id: int
     chat_id: int
+    username: str | None = None
     message: str
     notification_ids: list[int] | None = None
 
@@ -15,7 +17,7 @@ class TelegramUserMessage(BaseModel):
 class UserActivity(BaseModel):
     user_id: int
     chat_id: int
-    username: str
+    username: str | None = None
     is_active: bool = True  # can be false in case bot is blocked
     activity_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

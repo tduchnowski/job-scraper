@@ -1,22 +1,22 @@
-import os
 import asyncio
 import json
-
-from typing import Annotated
-from datetime import datetime
+import os
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response, status
-from aiogram import types, Bot, Dispatcher
+from datetime import datetime
+from typing import Annotated
+
+from aiogram import Bot, Dispatcher, types
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from loguru import logger
 from pydantic import ValidationError
 from redisaq import Consumer, Producer
 
-from services.bot.src.middleware import UserTrackingMiddleware
 from services.bot.src.consumers.notification import UserMessageProcessor
+from services.bot.src.middleware import UserTrackingMiddleware
 from services.bot.src.subscription_service import SubscriptionService
+from services.shared.infra.redis import create_consumer, create_producer
 from services.shared.storage.session import set_session_local
 from services.shared.utils.logger import setup_logger
-from services.shared.infra.redis import create_consumer, create_producer
-from loguru import logger
 
 
 def init_bot_and_dispatcher(subscription_service: SubscriptionService):
@@ -69,8 +69,18 @@ def create_app(bot=None, dp=None):
             await app.state.notification_status_producer.connect()
             producers.append(app.state.notification_status_producer)
 
+            # producer - user updates
+            redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
+            app.state.user_activity_producer = create_producer(
+                redis_url, redis_user_activity_topic
+            )
+            await app.state.user_activity_producer.connect()
+            producers.append(app.state.user_activity_producer)
+
             message_processor = UserMessageProcessor(
-                app.state.bot, app.state.notification_status_producer
+                app.state.bot,
+                app.state.notification_status_producer,
+                app.state.user_activity_producer,
             )
 
             # consumer - messages for users
@@ -87,14 +97,6 @@ def create_app(bot=None, dp=None):
                 app.state.user_messages_consumer.consume(message_processor.process)
             )
             background_tasks.append(user_messages_consumer_task)
-
-            # producer - user updates
-            redis_user_activity_topic = os.getenv("REDIS_USER_ACTIVITY_TOPIC", "")
-            app.state.user_activity_producer = create_producer(
-                redis_url, redis_user_activity_topic
-            )
-            await app.state.user_activity_producer.connect()
-            producers.append(app.state.user_activity_producer)
 
             # producer - subscription update
             redis_subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")

@@ -43,6 +43,7 @@ class UserActivityHandler(ConsumerHandler):
             user = UserORM(
                 id=user_activity.user_id,
                 chat_id=user_activity.chat_id,
+                username=user_activity.username,
                 is_active=user_activity.is_active,
                 last_interaction=user_activity.activity_time,
             )
@@ -100,7 +101,9 @@ class SubscriptionHandler(ConsumerHandler):
 
         await self.telegram_message_queue.enqueue(
             TelegramUserMessage(
-                chat_id=subscription.chat_id, message=ack_message
+                user_id=subscription.user_id,
+                chat_id=subscription.chat_id,
+                message=ack_message,
             ).model_dump(mode="json")
         )
 
