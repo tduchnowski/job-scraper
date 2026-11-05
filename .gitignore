@@ -40,3 +40,4 @@ htmlcov/
 *.bak
 *.tmp
 .secrets
+.cron_check.sh
