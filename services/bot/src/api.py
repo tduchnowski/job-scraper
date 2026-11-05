@@ -9,6 +9,7 @@ from aiogram import Bot, Dispatcher, types
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from loguru import logger
 from pydantic import ValidationError
+from redis.asyncio import Redis
 from redisaq import Consumer, Producer
 
 from services.bot.src.consumers.notification import UserMessageProcessor
@@ -46,6 +47,7 @@ def create_app(bot=None, dp=None):
             set_session_local()
 
             redis_url = os.getenv("REDIS_URL", "")
+            redis_client = Redis.from_url(redis_url)
 
             # producer - user subscriptions
             subscription_topic = os.getenv("REDIS_SUBSCRIPTIONS_TOPIC", "")
@@ -108,7 +110,7 @@ def create_app(bot=None, dp=None):
 
             # add middleware
             app.state.dp.message.middleware(
-                UserTrackingMiddleware(app.state.user_activity_producer)
+                UserTrackingMiddleware(redis_client, app.state.user_activity_producer)
             )
 
         yield

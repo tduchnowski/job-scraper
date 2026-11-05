@@ -25,6 +25,7 @@ dependencies = [
     "gunicorn (>=25.3.0,<26.0.0)",
     "redisaq (>=0.1.4,<0.2.0)",
     "alembic-postgresql-enum (>=1.10.0,<2.0.0)",
+    "redis (>=8.1.0,<9.0.0)",
 ]
 
 [build-system]
